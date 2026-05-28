@@ -47,6 +47,7 @@ soc-dss-platform-enterprise/
 ├── backend/                  # Spring Boot backend and DSS core engine
 ├── frontend/                 # React TypeScript dashboard
 ├── deploy/production/        # Docker Compose and production deployment files
+├── deploy/wazuh-lab/         # Optional Wazuh single-node lab for alert generation
 ├── integrations/wazuh/       # Wazuh integration guide and sample alert format
 ├── experiments/              # Optional validation environment using Wazuh
 ├── docs/                     # Architecture, API and research documentation
@@ -114,6 +115,23 @@ http://localhost:5173
 4. Click **Correlate Alerts**.
 5. Review generated incidents, risk scores and recommendations.
 6. Export incident CSV from the Reports section or API.
+
+## Optional Wazuh Lab
+
+For validation with real Wazuh alerts, start the Wazuh single-node lab:
+
+```bash
+cp deploy/wazuh-lab/.env.example deploy/wazuh-lab/.env
+make wazuh-lab-up
+```
+
+Export alerts from Wazuh and import them into SOC DSS:
+
+```bash
+make wazuh-lab-import
+```
+
+See `deploy/wazuh-lab/README.md` for details.
 
 ## Main API Endpoints
 
