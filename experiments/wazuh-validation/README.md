@@ -6,6 +6,8 @@ This folder is optional and is used only for experimental validation. The main p
 
 Use Wazuh to generate realistic security alerts, then import them into SOC DSS Platform for evaluation.
 
+Use `deploy/wazuh-lab/` to install and run the optional Wazuh single-node Docker lab.
+
 Recommended scenarios:
 
 1. SSH brute force
@@ -35,4 +37,13 @@ Import to SOC DSS Platform
 Correlate + assess risk + recommend response
         ↓
 Export CSV result for report
+```
+
+## Lab Commands
+
+```bash
+cp deploy/wazuh-lab/.env.example deploy/wazuh-lab/.env
+make wazuh-lab-up
+make wazuh-lab-export
+make wazuh-lab-import
 ```
