@@ -112,6 +112,7 @@ function App() {
 
   const riskData = riskChartData(summary);
   const scoreData = scoreChartData(incidents);
+  const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
 
   return (
     <div className="app-shell">
@@ -152,53 +153,60 @@ function App() {
                   <button className={chartView === 'score-line' ? 'active' : ''} onClick={() => setChartView('score-line')}>Score Line</button>
                 </div>
               </div>
-              <div className="chart">
-                <ResponsiveContainer width="100%" height={260}>
-                  {chartView === 'risk-donut' ? (
-                    <PieChart>
-                      <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={98} paddingAngle={4}>
-                        {riskData.map(item => (
-                          <Cell key={item.name} fill={item.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  ) : chartView === 'score-bar' ? (
-                    <BarChart data={scoreData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Bar dataKey="score" radius={[8, 8, 0, 0]}>
-                        {scoreData.map(item => (
-                          <Cell key={item.name} fill={item.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  ) : chartView === 'score-line' ? (
-                    <LineChart data={scoreData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                    </LineChart>
-                  ) : (
-                    <BarChart data={riskData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                        {riskData.map(item => (
-                          <Cell key={item.name} fill={item.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
+              {chartHasData ? (
+                <div className="chart">
+                  <ResponsiveContainer width="100%" height={260}>
+                    {chartView === 'risk-donut' ? (
+                      <PieChart>
+                        <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={98} paddingAngle={4}>
+                          {riskData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    ) : chartView === 'score-bar' ? (
+                      <BarChart data={scoreData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Bar dataKey="score" radius={[8, 8, 0, 0]}>
+                          {scoreData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    ) : chartView === 'score-line' ? (
+                      <LineChart data={scoreData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={riskData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {riskData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>No incident data yet</strong>
+                  <span>Import Wazuh alerts and run correlation to populate this chart.</span>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -239,7 +247,7 @@ function Metric({ title, value }: { title: string; value: string | number }) {
   return <div className="metric"><span>{title}</span><strong>{value}</strong></div>;
 }
 
-function ImportPage({ onImported, onCorrelate }: { onImported: () => void; onCorrelate: () => void }) {
+function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<void> | void; onCorrelate: () => Promise<void> | void }) {
   const [file, setFile] = React.useState<File | null>(null);
   const [result, setResult] = React.useState<ImportResult | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -251,6 +259,7 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => void; onCor
       const res = await api.importAlerts(file);
       setResult(res);
       await onImported();
+      await onCorrelate();
     } finally {
       setLoading(false);
     }
