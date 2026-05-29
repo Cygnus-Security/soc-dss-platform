@@ -1,13 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ShieldCheck, Upload, ListChecks, BarChart3, Download } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from './services/api';
 import type { DashboardSummary, Incident, ImportResult } from './types';
 import './styles.css';
 
 function riskClass(level?: string) {
   return `badge badge-${(level || 'low').toLowerCase()}`;
+}
+
+function riskColor(level?: string) {
+  switch ((level || 'low').toLowerCase()) {
+    case 'critical':
+      return '#dc2626';
+    case 'high':
+      return '#f97316';
+    case 'medium':
+      return '#eab308';
+    case 'low':
+      return '#16a34a';
+    default:
+      return '#64748b';
+  }
 }
 
 function App() {
@@ -95,7 +110,11 @@ function App() {
                     <XAxis dataKey="name" />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="value" />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {chartData.map(item => (
+                        <Cell key={item.name} fill={riskColor(item.name)} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
