@@ -1,10 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ShieldCheck, Upload, ListChecks, BarChart3, Download } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
 import { api } from './services/api';
 import type { DashboardSummary, Incident, ImportResult } from './types';
 import './styles.css';
+
+type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
+
+const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
 
 function riskClass(level?: string) {
   return `badge badge-${(level || 'low').toLowerCase()}`;
@@ -25,8 +43,30 @@ function riskColor(level?: string) {
   }
 }
 
+function riskChartData(summary: DashboardSummary | null) {
+  return riskLevels
+    .map(name => ({
+      name,
+      value: summary?.incidentsByRiskLevel[name] ?? summary?.incidentsByRiskLevel[name.toUpperCase()] ?? 0,
+      fill: riskColor(name)
+    }))
+    .filter(item => item.value > 0);
+}
+
+function scoreChartData(incidents: Incident[]) {
+  return [...incidents]
+    .sort((a, b) => b.riskScore - a.riskScore)
+    .map(incident => ({
+      name: `INC-${String(incident.id).padStart(4, '0')}`,
+      score: incident.riskScore,
+      level: incident.riskLevel,
+      fill: riskColor(incident.riskLevel)
+    }));
+}
+
 function App() {
   const [page, setPage] = React.useState<'dashboard' | 'import' | 'incidents'>('dashboard');
+  const [chartView, setChartView] = React.useState<ChartView>('risk-bar');
   const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [incidents, setIncidents] = React.useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(null);
@@ -70,7 +110,9 @@ function App() {
     setSelectedIncident(await api.incident(id));
   }
 
-  const chartData = summary ? Object.entries(summary.incidentsByRiskLevel).map(([name, value]) => ({ name, value })) : [];
+  const riskData = riskChartData(summary);
+  const scoreData = scoreChartData(incidents);
+  const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
 
   return (
     <div className="app-shell">
@@ -102,22 +144,69 @@ function App() {
               <Metric title="Alert Reduction" value={`${summary?.alertReductionRate ?? 0}%`} />
             </div>
             <div className="panel">
-              <h2>Risk Level Distribution</h2>
-              <div className="chart">
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                      {chartData.map(item => (
-                        <Cell key={item.name} fill={riskColor(item.name)} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="panel-heading">
+                <h2>{chartView.startsWith('risk') ? 'Risk Level Distribution' : 'Incident Risk Scores'}</h2>
+                <div className="chart-tabs" aria-label="Chart view">
+                  <button className={chartView === 'risk-bar' ? 'active' : ''} onClick={() => setChartView('risk-bar')}>Risk Bar</button>
+                  <button className={chartView === 'risk-donut' ? 'active' : ''} onClick={() => setChartView('risk-donut')}>Risk Donut</button>
+                  <button className={chartView === 'score-bar' ? 'active' : ''} onClick={() => setChartView('score-bar')}>Score Bar</button>
+                  <button className={chartView === 'score-line' ? 'active' : ''} onClick={() => setChartView('score-line')}>Score Line</button>
+                </div>
               </div>
+              {chartHasData ? (
+                <div className="chart">
+                  <ResponsiveContainer width="100%" height={260}>
+                    {chartView === 'risk-donut' ? (
+                      <PieChart>
+                        <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={98} paddingAngle={4}>
+                          {riskData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    ) : chartView === 'score-bar' ? (
+                      <BarChart data={scoreData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Bar dataKey="score" radius={[8, 8, 0, 0]}>
+                          {scoreData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    ) : chartView === 'score-line' ? (
+                      <LineChart data={scoreData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={riskData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {riskData.map(item => (
+                            <Cell key={item.name} fill={item.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>No incident data yet</strong>
+                  <span>Import Wazuh alerts and run correlation to populate this chart.</span>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -158,7 +247,7 @@ function Metric({ title, value }: { title: string; value: string | number }) {
   return <div className="metric"><span>{title}</span><strong>{value}</strong></div>;
 }
 
-function ImportPage({ onImported, onCorrelate }: { onImported: () => void; onCorrelate: () => void }) {
+function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<void> | void; onCorrelate: () => Promise<void> | void }) {
   const [file, setFile] = React.useState<File | null>(null);
   const [result, setResult] = React.useState<ImportResult | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -170,6 +259,7 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => void; onCor
       const res = await api.importAlerts(file);
       setResult(res);
       await onImported();
+      await onCorrelate();
     } finally {
       setLoading(false);
     }
