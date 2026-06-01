@@ -42,7 +42,7 @@ public class WazuhAlertImportService {
                     continue;
                 }
                 try {
-                    JsonNode root = objectMapper.readTree(line);
+                    JsonNode root = alertRoot(objectMapper.readTree(line));
                     SecurityAlert alert = toSecurityAlert(root, line);
                     if (alert.getWazuhRuleLevel() >= 3) {
                         alerts.add(alert);
@@ -61,22 +61,30 @@ public class WazuhAlertImportService {
         return new WazuhAlertImportResult(total, alerts.size(), skipped);
     }
 
+    private JsonNode alertRoot(JsonNode root) {
+        if (root.has("_source")) {
+            return root.path("_source");
+        }
+        return root;
+    }
+
     private SecurityAlert toSecurityAlert(JsonNode root, String raw) {
         JsonNode rule = root.path("rule");
         JsonNode agent = root.path("agent");
         JsonNode data = root.path("data");
+        JsonNode dataAlert = data.path("alert");
         JsonNode mitre = rule.path("mitre");
 
-        String ruleId = text(rule, "id", "unknown");
-        String description = text(rule, "description", "");
-        String groups = rule.path("groups").toString();
+        String ruleId = firstNonBlank(text(rule, "id", null), text(dataAlert, "signature_id", null), "unknown");
+        String description = firstNonBlank(text(rule, "description", null), text(dataAlert, "signature", null), text(root, "full_log", null), "");
+        String groups = firstNonBlank(rule.path("groups").toString(), text(dataAlert, "category", null), "");
 
         SecurityAlert alert = new SecurityAlert();
         alert.setSource("Wazuh");
         alert.setExternalId(text(root, "id", null));
-        alert.setEventTimestamp(parseTimestamp(text(root, "timestamp", null)));
+        alert.setEventTimestamp(parseTimestamp(firstNonBlank(text(root, "timestamp", null), text(root, "@timestamp", null), text(data, "timestamp", null))));
         alert.setWazuhRuleId(ruleId);
-        alert.setWazuhRuleLevel(rule.path("level").asInt(0));
+        alert.setWazuhRuleLevel(resolveRuleLevel(rule, dataAlert));
         alert.setAgentName(text(agent, "name", "unknown"));
         alert.setAgentIp(text(agent, "ip", null));
         alert.setSourceIp(firstNonBlank(
@@ -86,13 +94,27 @@ public class WazuhAlertImportService {
                 text(root, "srcip", null),
                 "unknown"
         ));
-        alert.setDestinationIp(firstNonBlank(text(data, "dstip", null), text(data, "dst_ip", null), null));
+        alert.setDestinationIp(firstNonBlank(text(data, "dstip", null), text(data, "dst_ip", null), text(data, "dest_ip", null), null));
         alert.setDescription(description);
         alert.setMitreTactic(firstArrayText(mitre.path("tactic")));
         alert.setMitreTechnique(firstArrayText(mitre.path("technique")));
         alert.setIncidentType(AlertClassifier.classify(ruleId, description, groups));
         alert.setRawJson(raw);
         return alert;
+    }
+
+    private int resolveRuleLevel(JsonNode rule, JsonNode dataAlert) {
+        int ruleLevel = rule.path("level").asInt(0);
+        if (ruleLevel > 0) {
+            return ruleLevel;
+        }
+
+        int severity = dataAlert.path("severity").asInt(0);
+        if (severity > 0) {
+            return Math.max(3, 12 - severity);
+        }
+
+        return 0;
     }
 
     private String text(JsonNode node, String field, String defaultValue) {

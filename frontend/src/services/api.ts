@@ -3,6 +3,7 @@ import type { DashboardSummary, ImportProgress, ImportResult, Incident, Security
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
 const UPLOAD_BATCH_CHARS = 512 * 1024;
+const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${url}`, options);
@@ -28,6 +29,70 @@ async function importAlertBatch(lines: string[], batchNumber: number): Promise<I
   });
 }
 
+function shouldParseAsStructuredJson(sample: string) {
+  const trimmed = sample.trimStart();
+  if (trimmed.startsWith('[')) return true;
+  return trimmed.startsWith('{') && (/^\{\s*\n/.test(trimmed) || /"hits"\s*:|"alerts"\s*:/.test(trimmed));
+}
+
+function extractAlertRecords(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const hits = record.hits as Record<string, unknown> | undefined;
+    if (hits && Array.isArray(hits.hits)) return hits.hits;
+    if (Array.isArray(record.alerts)) return record.alerts;
+    if (Array.isArray(record.data)) return record.data;
+    return [record];
+  }
+  return [];
+}
+
+async function importStructuredJsonFile(file: File, onProgress?: (progress: ImportProgress) => void): Promise<ImportResult> {
+  const records = extractAlertRecords(JSON.parse(await file.text()));
+  const total: ImportResult = { totalLines: 0, importedAlerts: 0, skippedLines: 0 };
+  let batchLines: string[] = [];
+  let batchChars = 0;
+  let batchNumber = 0;
+  let processed = 0;
+
+  async function flushBatch() {
+    if (batchLines.length === 0) return;
+    batchNumber++;
+    const result = await importAlertBatch(batchLines, batchNumber);
+    mergeImportResult(total, result);
+    batchLines = [];
+    batchChars = 0;
+    onProgress?.({
+      bytesRead: Math.round((processed / Math.max(records.length, 1)) * file.size),
+      fileSize: file.size,
+      totalLines: total.totalLines,
+      importedAlerts: total.importedAlerts,
+      skippedLines: total.skippedLines
+    });
+  }
+
+  for (const record of records) {
+    const line = JSON.stringify(record);
+    batchLines.push(line);
+    batchChars += line.length + 1;
+    processed++;
+    if (batchChars >= UPLOAD_BATCH_CHARS) {
+      await flushBatch();
+    }
+  }
+
+  await flushBatch();
+  onProgress?.({
+    bytesRead: file.size,
+    fileSize: file.size,
+    totalLines: total.totalLines,
+    importedAlerts: total.importedAlerts,
+    skippedLines: total.skippedLines
+  });
+  return total;
+}
+
 export const api = {
   summary: () => request<DashboardSummary>('/dashboard/summary'),
   alerts: () => request<SecurityAlert[]>('/alerts'),
@@ -35,6 +100,11 @@ export const api = {
   incident: (id: number) => request<Incident>(`/incidents/${id}`),
   correlate: () => request<Incident[]>('/incidents/correlate', { method: 'POST' }),
   importAlerts: async (file: File, onProgress?: (progress: ImportProgress) => void): Promise<ImportResult> => {
+    const sample = await file.slice(0, STRUCTURED_JSON_SAMPLE_BYTES).text();
+    if (shouldParseAsStructuredJson(sample)) {
+      return importStructuredJsonFile(file, onProgress);
+    }
+
     const decoder = new TextDecoder();
     const total: ImportResult = { totalLines: 0, importedAlerts: 0, skippedLines: 0 };
     let carry = '';
