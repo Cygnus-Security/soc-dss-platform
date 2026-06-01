@@ -23,6 +23,15 @@ public class AlertClassifier {
         if (containsAny(text, "nmap", "scan", "recon", "suricata")) {
             return "Reconnaissance / Network Scan";
         }
+        if (containsAny(text, "aminer", "frequency anomaly", "eventcount", "new event type", "new value")) {
+            if (containsAny(text, "dns", "query")) {
+                return "DNS Anomaly";
+            }
+            if (containsAny(text, "audit", "login", "user_auth", "user_login", "pam")) {
+                return "Authentication Anomaly";
+            }
+            return "Log Anomaly";
+        }
         return "General Security Alert";
     }
 

@@ -271,8 +271,8 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<voi
 
   return (
     <section className="panel import-panel">
-      <h2>Import Wazuh Alerts</h2>
-      <p>Upload a Wazuh <code>alerts.json</code> JSON-lines file. Large files are split into smaller upload batches automatically.</p>
+      <h2>Import Security Logs</h2>
+      <p>Upload Wazuh or AMiner JSON-lines logs. Large files are split into smaller upload batches automatically.</p>
       <input type="file" accept=".json,.jsonl,.txt" onChange={e => setFile(e.target.files?.[0] ?? null)} />
       <div className="actions">
         <button onClick={upload} disabled={!file || loading}>{loading ? 'Importing...' : 'Import Alerts'}</button>
