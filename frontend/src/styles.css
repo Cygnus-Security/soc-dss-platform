@@ -62,6 +62,10 @@ tr:hover, tr.selected { background: #f8fafc; }
 .import-panel input { margin: 16px 0; display: block; }
 .actions { display: flex; gap: 12px; }
 .actions button:disabled { opacity: .5; cursor: not-allowed; }
+.import-progress { margin-top: 16px; }
+.progress-bar { height: 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.progress-bar span { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width .2s ease; }
+.progress-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; color: #64748b; font-size: 13px; font-weight: 700; }
 .result { margin-top: 16px; padding: 12px; border-radius: 12px; background: #ecfdf5; color: #065f46; }
 .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 20px; }
 .detail-grid span { color: #64748b; }

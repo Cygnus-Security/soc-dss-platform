@@ -49,3 +49,11 @@ export interface ImportResult {
   importedAlerts: number;
   skippedLines: number;
 }
+
+export interface ImportProgress {
+  bytesRead: number;
+  fileSize: number;
+  totalLines: number;
+  importedAlerts: number;
+  skippedLines: number;
+}

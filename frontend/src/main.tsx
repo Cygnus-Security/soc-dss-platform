@@ -17,7 +17,7 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { DashboardSummary, Incident, ImportResult } from './types';
+import type { DashboardSummary, ImportProgress, Incident, ImportResult } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
@@ -250,13 +250,17 @@ function Metric({ title, value }: { title: string; value: string | number }) {
 function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<void> | void; onCorrelate: () => Promise<void> | void }) {
   const [file, setFile] = React.useState<File | null>(null);
   const [result, setResult] = React.useState<ImportResult | null>(null);
+  const [progress, setProgress] = React.useState<ImportProgress | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const importPercent = progress && progress.fileSize > 0 ? Math.round((progress.bytesRead / progress.fileSize) * 100) : 0;
 
   async function upload() {
     if (!file) return;
     setLoading(true);
+    setResult(null);
+    setProgress(null);
     try {
-      const res = await api.importAlerts(file);
+      const res = await api.importAlerts(file, setProgress);
       setResult(res);
       await onImported();
       await onCorrelate();
@@ -268,12 +272,24 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<voi
   return (
     <section className="panel import-panel">
       <h2>Import Wazuh Alerts</h2>
-      <p>Upload a Wazuh <code>alerts.json</code> JSON-lines file. The platform will normalize and store alerts before correlation.</p>
+      <p>Upload a Wazuh <code>alerts.json</code> JSON-lines file. Large files are split into smaller upload batches automatically.</p>
       <input type="file" accept=".json,.jsonl,.txt" onChange={e => setFile(e.target.files?.[0] ?? null)} />
       <div className="actions">
         <button onClick={upload} disabled={!file || loading}>{loading ? 'Importing...' : 'Import Alerts'}</button>
         <button onClick={onCorrelate}>Correlate Alerts</button>
       </div>
+      {progress && (
+        <div className="import-progress">
+          <div className="progress-bar">
+            <span style={{ width: `${importPercent}%` }} />
+          </div>
+          <div className="progress-meta">
+            <span>{importPercent}%</span>
+            <span>{progress.importedAlerts} imported</span>
+            <span>{progress.skippedLines} skipped</span>
+          </div>
+        </div>
+      )}
       {result && <div className="result">Imported {result.importedAlerts} alerts from {result.totalLines} lines. Skipped {result.skippedLines} lines.</div>}
     </section>
   );
