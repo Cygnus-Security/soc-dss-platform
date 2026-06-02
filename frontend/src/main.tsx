@@ -17,12 +17,13 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { DashboardSummary, ImportProgress, Incident, ImportResult } from './types';
+import type { CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
 
 const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function riskClass(level?: string) {
   return `badge badge-${(level || 'low').toLowerCase()}`;
@@ -72,6 +73,7 @@ function App() {
   const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState('');
+  const [correlationStatus, setCorrelationStatus] = React.useState<CorrelationJobStatus | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -96,9 +98,25 @@ function App() {
     setLoading(true);
     setMessage('');
     try {
-      await api.correlate();
+      const started = await api.correlate();
+      setCorrelationStatus(started);
+      setMessage('Alert correlation started. This can take a few minutes for large imports.');
+      for (let attempt = 0; attempt < 120; attempt++) {
+        await sleep(3000);
+        const status = await api.correlationStatus();
+        setCorrelationStatus(status);
+        if (status.status === 'COMPLETED') {
+          await refresh();
+          setMessage(`Alert correlation completed successfully${status.incidentCount != null ? ` with ${status.incidentCount} incidents` : ''}.`);
+          return;
+        }
+        if (status.status === 'FAILED') {
+          setMessage(`Correlation failed: ${status.message}`);
+          return;
+        }
+      }
       await refresh();
-      setMessage('Alert correlation completed successfully.');
+      setMessage('Correlation is still running. Refresh later to see updated incidents.');
     } catch (e) {
       setMessage('Correlation failed. Check backend logs.');
     } finally {
@@ -134,6 +152,9 @@ function App() {
         </header>
 
         {message && <div className="notice">{message}</div>}
+        {correlationStatus?.status === 'RUNNING' && (
+          <div className="notice notice-warn">Correlation is running in the background. You can keep importing or refresh later.</div>
+        )}
 
         {page === 'dashboard' && (
           <section>

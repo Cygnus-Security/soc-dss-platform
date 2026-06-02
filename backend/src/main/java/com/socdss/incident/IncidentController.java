@@ -1,6 +1,8 @@
 package com.socdss.incident;
 
 import com.socdss.correlation.CorrelationService;
+import com.socdss.correlation.CorrelationJobStatus;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,9 +34,12 @@ public class IncidentController {
     }
 
     @PostMapping("/correlate")
-    public List<IncidentDto> correlate() {
-        return correlationService.correlateAll().stream()
-                .map(i -> IncidentDto.from(i, false))
-                .toList();
+    public ResponseEntity<CorrelationJobStatus> correlate() {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(correlationService.startCorrelationJob());
+    }
+
+    @GetMapping("/correlation/status")
+    public CorrelationJobStatus correlationStatus() {
+        return correlationService.jobStatus();
     }
 }

@@ -15,9 +15,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class CorrelationService {
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final AtomicReference<CorrelationJobStatus> jobStatus = new AtomicReference<>(
+            new CorrelationJobStatus("IDLE", null, null, null, "No correlation job has run yet.")
+    );
+
     private final SecurityAlertRepository alertRepository;
     private final IncidentRepository incidentRepository;
     private final RiskAssessmentService riskAssessmentService;
@@ -31,6 +39,43 @@ public class CorrelationService {
         this.incidentRepository = incidentRepository;
         this.riskAssessmentService = riskAssessmentService;
         this.recommendationService = recommendationService;
+    }
+
+    public CorrelationJobStatus startCorrelationJob() {
+        CorrelationJobStatus current = jobStatus.get();
+        if ("RUNNING".equals(current.status())) {
+            return current;
+        }
+
+        CorrelationJobStatus started = new CorrelationJobStatus("RUNNING", Instant.now(), null, null, "Correlation is running.");
+        jobStatus.set(started);
+
+        executor.submit(() -> {
+            try {
+                int incidentCount = correlateAll().size();
+                jobStatus.set(new CorrelationJobStatus(
+                        "COMPLETED",
+                        started.startedAt(),
+                        Instant.now(),
+                        incidentCount,
+                        "Correlation completed successfully."
+                ));
+            } catch (Exception e) {
+                jobStatus.set(new CorrelationJobStatus(
+                        "FAILED",
+                        started.startedAt(),
+                        Instant.now(),
+                        null,
+                        e.getMessage()
+                ));
+            }
+        });
+
+        return started;
+    }
+
+    public CorrelationJobStatus jobStatus() {
+        return jobStatus.get();
     }
 
     @Transactional

@@ -1,4 +1,4 @@
-import type { DashboardSummary, ImportProgress, ImportResult, Incident, SecurityAlert } from '../types';
+import type { CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, SecurityAlert } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -98,7 +98,8 @@ export const api = {
   alerts: () => request<SecurityAlert[]>('/alerts'),
   incidents: () => request<Incident[]>('/incidents'),
   incident: (id: number) => request<Incident>(`/incidents/${id}`),
-  correlate: () => request<Incident[]>('/incidents/correlate', { method: 'POST' }),
+  correlate: () => request<CorrelationJobStatus>('/incidents/correlate', { method: 'POST' }),
+  correlationStatus: () => request<CorrelationJobStatus>('/incidents/correlation/status'),
   importAlerts: async (file: File, onProgress?: (progress: ImportProgress) => void): Promise<ImportResult> => {
     const sample = await file.slice(0, STRUCTURED_JSON_SAMPLE_BYTES).text();
     if (shouldParseAsStructuredJson(sample)) {

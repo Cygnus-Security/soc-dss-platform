@@ -57,3 +57,13 @@ export interface ImportProgress {
   importedAlerts: number;
   skippedLines: number;
 }
+
+export type CorrelationStatusValue = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface CorrelationJobStatus {
+  status: CorrelationStatusValue;
+  startedAt?: string;
+  finishedAt?: string;
+  incidentCount?: number;
+  message: string;
+}

@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: soc-dss-postgres
+    command: ["postgres", "-c", "max_wal_size=2GB", "-c", "checkpoint_timeout=15min"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-socdss}
       POSTGRES_USER: ${POSTGRES_USER:-socdss}
