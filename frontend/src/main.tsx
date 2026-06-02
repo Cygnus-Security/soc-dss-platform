@@ -75,6 +75,8 @@ function App() {
   const [message, setMessage] = React.useState('');
   const [correlationStatus, setCorrelationStatus] = React.useState<CorrelationJobStatus | null>(null);
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
+  const [reportFrom, setReportFrom] = React.useState('');
+  const [reportTo, setReportTo] = React.useState('');
 
   async function refresh() {
     setLoading(true);
@@ -147,6 +149,7 @@ function App() {
   const riskData = riskChartData(summary);
   const scoreData = scoreChartData(incidents);
   const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
+  const reportRange = reportFrom && reportTo ? { from: reportFrom, to: reportTo } : undefined;
 
   if (!auth) {
     return <div className="auth-shell"><div className="panel auth-panel"><h1>SOC DSS</h1><p>Checking session...</p></div></div>;
@@ -175,6 +178,7 @@ function App() {
         <button className={page === 'incidents' ? 'active' : ''} onClick={() => setPage('incidents')}><ListChecks size={18} /> Incidents</button>
         <button className={page === 'model' ? 'active' : ''} onClick={() => setPage('model')}><SlidersHorizontal size={18} /> Decision Model</button>
         <a className="download" href={api.reportUrl()}><Download size={18} /> Export CSV</a>
+        <a className="download" href={api.reportPdfUrl()}><Download size={18} /> Export PDF</a>
       </aside>
 
       <main className="main">
@@ -204,10 +208,19 @@ function App() {
             </div>
             <div className="panel report-panel">
               <h2>Decision Reports</h2>
+              <div className="report-filters">
+                <label>
+                  <span>From</span>
+                  <input type="date" value={reportFrom} onChange={e => setReportFrom(e.target.value)} />
+                </label>
+                <label>
+                  <span>To</span>
+                  <input type="date" value={reportTo} onChange={e => setReportTo(e.target.value)} min={reportFrom || undefined} />
+                </label>
+              </div>
               <div className="report-actions">
-                <a href={api.reportUrl('week')}>Weekly CSV</a>
-                <a href={api.reportUrl('month')}>Monthly CSV</a>
-                <a href={api.reportUrl('year')}>Yearly CSV</a>
+                <a href={api.reportUrl(reportRange)}>Export CSV</a>
+                <a href={api.reportPdfUrl(reportRange)}>Export PDF</a>
               </div>
             </div>
             <div className="panel">

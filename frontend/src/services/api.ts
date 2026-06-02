@@ -6,6 +6,11 @@ const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+type ReportRange = {
+  from?: string;
+  to?: string;
+};
+
 let csrfToken: string | null = null;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -25,6 +30,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 function storeAuthStatus(status: AuthStatus) {
   csrfToken = status.csrfToken ?? null;
   return status;
+}
+
+function reportQuery(range?: ReportRange) {
+  if (!range?.from || !range?.to) {
+    return '';
+  }
+  const params = new URLSearchParams({ from: range.from, to: range.to });
+  return `?${params.toString()}`;
 }
 
 function mergeImportResult(total: ImportResult, next: ImportResult) {
@@ -213,5 +226,6 @@ export const api = {
 
     return total;
   },
-  reportUrl: (period?: 'week' | 'month' | 'year') => `${API_BASE}/reports/incidents.csv${period ? `?period=${period}` : ''}`
+  reportUrl: (range?: ReportRange) => `${API_BASE}/reports/incidents.csv${reportQuery(range)}`,
+  reportPdfUrl: (range?: ReportRange) => `${API_BASE}/reports/incidents.pdf${reportQuery(range)}`
 };
