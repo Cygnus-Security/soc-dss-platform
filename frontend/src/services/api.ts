@@ -4,9 +4,6 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
 const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-let csrfToken: string | null = null;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase();
@@ -20,11 +17,6 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error(`API request failed: ${response.status}`);
   }
   return response.json() as Promise<T>;
-}
-
-function storeAuthStatus(status: AuthStatus) {
-  csrfToken = status.csrfToken ?? null;
-  return status;
 }
 
 function mergeImportResult(total: ImportResult, next: ImportResult) {
@@ -213,5 +205,6 @@ export const api = {
 
     return total;
   },
-  reportUrl: (period?: 'week' | 'month' | 'year') => `${API_BASE}/reports/incidents.csv${period ? `?period=${period}` : ''}`
+  reportUrl: (range?: ReportRange) => `${API_BASE}/reports/incidents.csv${reportQuery(range)}`,
+  reportPdfUrl: (range?: ReportRange) => `${API_BASE}/reports/incidents.pdf${reportQuery(range)}`
 };
