@@ -1,4 +1,4 @@
-import type { CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -6,7 +6,7 @@ const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, options);
+  const response = await fetch(`${API_BASE}${url}`, { credentials: 'include', ...options });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }
@@ -94,6 +94,18 @@ async function importStructuredJsonFile(file: File, onProgress?: (progress: Impo
 }
 
 export const api = {
+  authStatus: () => request<AuthStatus>('/auth/status'),
+  login: (username: string, password: string) => request<AuthStatus>('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  }),
+  changePassword: (currentPassword: string, newPassword: string) => request<AuthStatus>('/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword })
+  }),
+  logout: () => fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }),
   summary: () => request<DashboardSummary>('/dashboard/summary'),
   alerts: () => request<SecurityAlert[]>('/alerts'),
   incidents: () => request<Incident[]>('/incidents'),
