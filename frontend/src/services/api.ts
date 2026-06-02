@@ -1,4 +1,4 @@
-import type { CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, SecurityAlert } from '../types';
+import type { CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -98,8 +98,24 @@ export const api = {
   alerts: () => request<SecurityAlert[]>('/alerts'),
   incidents: () => request<Incident[]>('/incidents'),
   incident: (id: number) => request<Incident>(`/incidents/${id}`),
+  feedback: (id: number, feedback: IncidentFeedback) => request<Incident>(`/incidents/${id}/feedback`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback)
+  }),
   correlate: () => request<CorrelationJobStatus>('/incidents/correlate', { method: 'POST' }),
   correlationStatus: () => request<CorrelationJobStatus>('/incidents/correlation/status'),
+  riskModel: () => request<RiskModel>('/risk-model'),
+  updateRiskModel: (model: RiskModel) => request<RiskModel>('/risk-model', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(model)
+  }),
+  whatIf: (input: WhatIfRequest) => request<RiskAssessmentResult>('/risk-model/what-if', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
+  }),
   importAlerts: async (file: File, onProgress?: (progress: ImportProgress) => void): Promise<ImportResult> => {
     const sample = await file.slice(0, STRUCTURED_JSON_SAMPLE_BYTES).text();
     if (shouldParseAsStructuredJson(sample)) {
@@ -163,5 +179,5 @@ export const api = {
 
     return total;
   },
-  reportUrl: () => `${API_BASE}/reports/incidents.csv`
+  reportUrl: (period?: 'week' | 'month' | 'year') => `${API_BASE}/reports/incidents.csv${period ? `?period=${period}` : ''}`
 };

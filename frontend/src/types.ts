@@ -41,6 +41,11 @@ export interface Incident {
   mitreTechnique?: string;
   recommendation: string;
   explanation: string;
+  analystVerdict?: string;
+  analystNotes?: string;
+  decisionStatus?: string;
+  decisionAdvice?: DecisionAdvice;
+  riskFactors?: RiskFactor[];
   relatedAlerts: SecurityAlert[];
 }
 
@@ -66,4 +71,52 @@ export interface CorrelationJobStatus {
   finishedAt?: string;
   incidentCount?: number;
   message: string;
+}
+
+export interface RiskFactor {
+  name: string;
+  rawScore: number;
+  weight: number;
+  contribution: number;
+  reason: string;
+}
+
+export interface RiskAssessmentResult {
+  score: number;
+  level: RiskLevel;
+  explanation: string;
+  factors: RiskFactor[];
+}
+
+export interface RiskModel {
+  severityWeight: number;
+  assetWeight: number;
+  frequencyWeight: number;
+  mitreWeight: number;
+  exposureWeight: number;
+  vulnerabilityWeight: number;
+}
+
+export interface WhatIfRequest {
+  assetCriticality: string;
+  exposure: string;
+  alertCount: number;
+  maxRuleLevel: number;
+  mitreTactic: string;
+  vulnerabilityContext: boolean;
+}
+
+export interface IncidentFeedback {
+  analystVerdict: string;
+  analystNotes: string;
+  decisionStatus: string;
+}
+
+export interface DecisionAdvice {
+  priority: string;
+  slaHours: number;
+  confidence: number;
+  escalation: string;
+  rationale: string;
+  nextActions: string[];
 }
