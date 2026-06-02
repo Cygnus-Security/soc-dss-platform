@@ -4,6 +4,7 @@ import com.socdss.correlation.CorrelationService;
 import com.socdss.correlation.CorrelationJobStatus;
 import com.socdss.decision.DecisionSupportService;
 import com.socdss.risk.RiskAssessmentService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +43,7 @@ public class IncidentController {
     }
 
     @PatchMapping("/{id}/feedback")
-    public ResponseEntity<IncidentDto> feedback(@PathVariable Long id, @RequestBody IncidentFeedbackRequest feedback) {
+    public ResponseEntity<IncidentDto> feedback(@PathVariable Long id, @Valid @RequestBody IncidentFeedbackRequest feedback) {
         return incidentRepository.findById(id)
                 .map(incident -> {
                     incident.setAnalystVerdict(feedback.analystVerdict());

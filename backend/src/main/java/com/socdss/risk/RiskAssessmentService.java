@@ -113,8 +113,8 @@ public class RiskAssessmentService {
     }
 
     public RiskAssessmentResult assessWhatIf(WhatIfRequest request) {
-        int maxRuleLevel = request.maxRuleLevel() == null ? 6 : request.maxRuleLevel();
-        int alertCount = request.alertCount() == null ? 1 : request.alertCount();
+        int maxRuleLevel = request.maxRuleLevel() == null ? 6 : clamp(request.maxRuleLevel(), 0, 16);
+        int alertCount = request.alertCount() == null ? 1 : clamp(request.alertCount(), 1, 1000);
         String criticality = blankToDefault(request.assetCriticality(), "Medium");
         String exposure = blankToDefault(request.exposure(), "Internal");
         String tactic = blankToDefault(request.mitreTactic(), "");
@@ -146,12 +146,12 @@ public class RiskAssessmentService {
 
     public RiskModelDto updateModel(RiskModelDto dto) {
         RiskModelConfig config = configRepository.findAll().stream().findFirst().orElseGet(this::defaultConfig);
-        config.setSeverityWeight(nonNegative(dto.severityWeight()));
-        config.setAssetWeight(nonNegative(dto.assetWeight()));
-        config.setFrequencyWeight(nonNegative(dto.frequencyWeight()));
-        config.setMitreWeight(nonNegative(dto.mitreWeight()));
-        config.setExposureWeight(nonNegative(dto.exposureWeight()));
-        config.setVulnerabilityWeight(nonNegative(dto.vulnerabilityWeight()));
+        config.setSeverityWeight(safeWeight(dto.severityWeight()));
+        config.setAssetWeight(safeWeight(dto.assetWeight()));
+        config.setFrequencyWeight(safeWeight(dto.frequencyWeight()));
+        config.setMitreWeight(safeWeight(dto.mitreWeight()));
+        config.setExposureWeight(safeWeight(dto.exposureWeight()));
+        config.setVulnerabilityWeight(safeWeight(dto.vulnerabilityWeight()));
         config.setUpdatedAt(Instant.now());
         return RiskModelDto.from(configRepository.save(config));
     }
@@ -160,8 +160,15 @@ public class RiskAssessmentService {
         return configRepository.save(new RiskModelConfig());
     }
 
-    private double nonNegative(double value) {
-        return Math.max(value, 0.0);
+    private double safeWeight(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+        return Math.min(Math.max(value, 0.0), 10.0);
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private List<RiskFactor> factors(Object... values) {

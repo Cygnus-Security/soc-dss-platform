@@ -21,6 +21,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/reports")
 public class ReportController {
+    private static final String FORMULA_PREFIXES = "=+-@";
+
     private final IncidentRepository incidentRepository;
     private final DecisionSupportService decisionSupportService;
 
@@ -92,7 +94,15 @@ public class ReportController {
 
     private String q(String value) {
         if (value == null) return "\"\"";
-        return "\"" + value.replace("\"", "\"\"") + "\"";
+        String sanitized = value.replace('\r', ' ').replace('\n', ' ');
+        String formulaCheck = sanitized.stripLeading();
+        if (!formulaCheck.isEmpty()) {
+            char first = formulaCheck.charAt(0);
+            if (FORMULA_PREFIXES.indexOf(first) >= 0 || first == '\t') {
+                sanitized = "'" + sanitized;
+            }
+        }
+        return "\"" + sanitized.replace("\"", "\"\"") + "\"";
     }
 
     private record TimeRange(Instant from, Instant to, String label) {}
