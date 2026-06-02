@@ -1,6 +1,8 @@
 package com.socdss.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,17 +16,17 @@ public class AuthController {
     }
 
     @GetMapping("/status")
-    public AuthStatus status(HttpSession session) {
-        return authService.status(session);
+    public AuthStatus status(HttpServletRequest request) {
+        return authService.status(request.getSession(false));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthStatus> login(@RequestBody LoginRequest request, HttpSession session) {
-        return ResponseEntity.ok(authService.login(request, session));
+    public ResponseEntity<AuthStatus> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(authService.login(request, servletRequest));
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<AuthStatus> changePassword(@RequestBody ChangePasswordRequest request, HttpSession session) {
+    public ResponseEntity<AuthStatus> changePassword(@Valid @RequestBody ChangePasswordRequest request, HttpSession session) {
         return ResponseEntity.ok(authService.changePassword(request, session));
     }
 

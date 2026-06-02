@@ -4,13 +4,27 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
 const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+let csrfToken: string | null = null;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, { credentials: 'include', ...options });
+  const method = (options?.method ?? 'GET').toUpperCase();
+  const headers = new Headers(options?.headers);
+  if (!SAFE_METHODS.has(method) && csrfToken) {
+    headers.set('X-CSRF-Token', csrfToken);
+  }
+
+  const response = await fetch(`${API_BASE}${url}`, { ...options, credentials: 'include', headers });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }
   return response.json() as Promise<T>;
+}
+
+function storeAuthStatus(status: AuthStatus) {
+  csrfToken = status.csrfToken ?? null;
+  return status;
 }
 
 function mergeImportResult(total: ImportResult, next: ImportResult) {
@@ -94,18 +108,26 @@ async function importStructuredJsonFile(file: File, onProgress?: (progress: Impo
 }
 
 export const api = {
-  authStatus: () => request<AuthStatus>('/auth/status'),
+  authStatus: () => request<AuthStatus>('/auth/status').then(storeAuthStatus),
   login: (username: string, password: string) => request<AuthStatus>('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
-  }),
+  }).then(storeAuthStatus),
   changePassword: (currentPassword: string, newPassword: string) => request<AuthStatus>('/auth/change-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ currentPassword, newPassword })
-  }),
-  logout: () => fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }),
+  }).then(storeAuthStatus),
+  logout: async () => {
+    const headers = new Headers();
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken);
+    }
+    const response = await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include', headers });
+    csrfToken = null;
+    return response;
+  },
   summary: () => request<DashboardSummary>('/dashboard/summary'),
   alerts: () => request<SecurityAlert[]>('/alerts'),
   incidents: () => request<Incident[]>('/incidents'),

@@ -1,5 +1,6 @@
 package com.socdss.risk;
 
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,12 +18,12 @@ public class RiskModelController {
     }
 
     @PutMapping
-    public RiskModelDto update(@RequestBody RiskModelDto model) {
+    public RiskModelDto update(@Valid @RequestBody RiskModelDto model) {
         return riskAssessmentService.updateModel(model);
     }
 
     @PostMapping("/what-if")
-    public RiskAssessmentResult whatIf(@RequestBody WhatIfRequest request) {
+    public RiskAssessmentResult whatIf(@Valid @RequestBody WhatIfRequest request) {
         return riskAssessmentService.assessWhatIf(request);
     }
 }

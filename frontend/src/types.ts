@@ -116,6 +116,7 @@ export interface AuthStatus {
   authenticated: boolean;
   username?: string;
   mustChangePassword: boolean;
+  csrfToken?: string;
 }
 
 export interface DecisionAdvice {
