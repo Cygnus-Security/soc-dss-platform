@@ -17,7 +17,7 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
@@ -74,6 +74,7 @@ function App() {
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [correlationStatus, setCorrelationStatus] = React.useState<CorrelationJobStatus | null>(null);
+  const [auth, setAuth] = React.useState<AuthStatus | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -91,8 +92,23 @@ function App() {
   }
 
   React.useEffect(() => {
-    refresh().catch(console.error);
+    api.authStatus()
+      .then(status => {
+        setAuth(status);
+        if (status.authenticated && !status.mustChangePassword) {
+          refresh().catch(console.error);
+        }
+      })
+      .catch(() => setAuth({ authenticated: false, mustChangePassword: false }));
   }, []);
+
+  async function handleLogout() {
+    await api.logout();
+    setAuth({ authenticated: false, mustChangePassword: false });
+    setSummary(null);
+    setIncidents([]);
+    setSelectedIncident(null);
+  }
 
   async function handleCorrelate() {
     setLoading(true);
@@ -132,6 +148,24 @@ function App() {
   const scoreData = scoreChartData(incidents);
   const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
 
+  if (!auth) {
+    return <div className="auth-shell"><div className="panel auth-panel"><h1>SOC DSS</h1><p>Checking session...</p></div></div>;
+  }
+
+  if (!auth.authenticated) {
+    return <LoginPage onAuthenticated={status => {
+      setAuth(status);
+      if (!status.mustChangePassword) refresh().catch(console.error);
+    }} />;
+  }
+
+  if (auth.mustChangePassword) {
+    return <ChangePasswordPage onChanged={status => {
+      setAuth(status);
+      refresh().catch(console.error);
+    }} />;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -149,7 +183,10 @@ function App() {
             <h1>SOC Decision Support Platform</h1>
             <p>Alert correlation, risk assessment and incident response recommendation.</p>
           </div>
-          <button onClick={refresh}>{loading ? 'Refreshing...' : 'Refresh'}</button>
+          <div className="topbar-actions">
+            <button onClick={refresh}>{loading ? 'Refreshing...' : 'Refresh'}</button>
+            <button onClick={handleLogout}>Logout</button>
+          </div>
         </header>
 
         {message && <div className="notice">{message}</div>}
@@ -276,6 +313,82 @@ function App() {
 
 function Metric({ title, value }: { title: string; value: string | number }) {
   return <div className="metric"><span>{title}</span><strong>{value}</strong></div>;
+}
+
+function LoginPage({ onAuthenticated }: { onAuthenticated: (status: AuthStatus) => void }) {
+  const [username, setUsername] = React.useState('admin');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      onAuthenticated(await api.login(username, password));
+    } catch {
+      setError('Invalid username or password.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="auth-shell">
+      <form className="panel auth-panel" onSubmit={submit}>
+        <div className="brand auth-brand"><ShieldCheck size={30} /> <span>SOC DSS</span></div>
+        <h1>Sign in</h1>
+        <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" autoComplete="username" />
+        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" autoComplete="current-password" />
+        {error && <div className="auth-error">{error}</div>}
+        <button disabled={loading}>{loading ? 'Signing in...' : 'Login'}</button>
+      </form>
+    </div>
+  );
+}
+
+function ChangePasswordPage({ onChanged }: { onChanged: (status: AuthStatus) => void }) {
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (newPassword.length < 8) {
+      setError('New password must have at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Password confirmation does not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      onChanged(await api.changePassword(currentPassword, newPassword));
+    } catch {
+      setError('Unable to change password. Check the current password.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="auth-shell">
+      <form className="panel auth-panel" onSubmit={submit}>
+        <div className="brand auth-brand"><ShieldCheck size={30} /> <span>SOC DSS</span></div>
+        <h1>Change password</h1>
+        <input value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Current password" type="password" autoComplete="current-password" />
+        <input value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" type="password" autoComplete="new-password" />
+        <input value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" type="password" autoComplete="new-password" />
+        {error && <div className="auth-error">{error}</div>}
+        <button disabled={loading}>{loading ? 'Saving...' : 'Save Password'}</button>
+      </form>
+    </div>
+  );
 }
 
 function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<void> | void; onCorrelate: () => Promise<void> | void }) {

@@ -112,6 +112,12 @@ export interface IncidentFeedback {
   decisionStatus: string;
 }
 
+export interface AuthStatus {
+  authenticated: boolean;
+  username?: string;
+  mustChangePassword: boolean;
+}
+
 export interface DecisionAdvice {
   priority: string;
   slaHours: number;
