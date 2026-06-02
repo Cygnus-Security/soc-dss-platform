@@ -47,7 +47,7 @@ public class Incident {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "incident_alerts",
             joinColumns = @JoinColumn(name = "incident_id"),

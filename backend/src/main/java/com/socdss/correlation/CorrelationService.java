@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class CorrelationService {
+    private static final int RELATED_ALERT_SAMPLE_LIMIT = 100;
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicReference<CorrelationJobStatus> jobStatus = new AtomicReference<>(
             new CorrelationJobStatus("IDLE", null, null, null, "No correlation job has run yet.")
@@ -138,7 +140,7 @@ public class CorrelationService {
         incident.setRiskLevel(risk.level());
         incident.setExplanation(risk.explanation());
         incident.setRecommendation(recommendationService.recommend(first.getIncidentType(), risk.level()));
-        incident.getAlerts().addAll(relatedAlerts);
+        incident.getAlerts().addAll(relatedAlerts.stream().limit(RELATED_ALERT_SAMPLE_LIMIT).toList());
         return incident;
     }
 

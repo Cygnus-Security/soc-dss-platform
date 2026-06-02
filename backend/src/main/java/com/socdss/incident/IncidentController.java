@@ -4,6 +4,7 @@ import com.socdss.correlation.CorrelationService;
 import com.socdss.correlation.CorrelationJobStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class IncidentController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<IncidentDto> detail(@PathVariable Long id) {
         return incidentRepository.findById(id)
                 .map(i -> ResponseEntity.ok(IncidentDto.from(i, true)))
