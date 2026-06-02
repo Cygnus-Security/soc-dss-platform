@@ -1,0 +1,28 @@
+package com.socdss.risk;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/risk-model")
+public class RiskModelController {
+    private final RiskAssessmentService riskAssessmentService;
+
+    public RiskModelController(RiskAssessmentService riskAssessmentService) {
+        this.riskAssessmentService = riskAssessmentService;
+    }
+
+    @GetMapping
+    public RiskModelDto current() {
+        return riskAssessmentService.currentModel();
+    }
+
+    @PutMapping
+    public RiskModelDto update(@RequestBody RiskModelDto model) {
+        return riskAssessmentService.updateModel(model);
+    }
+
+    @PostMapping("/what-if")
+    public RiskAssessmentResult whatIf(@RequestBody WhatIfRequest request) {
+        return riskAssessmentService.assessWhatIf(request);
+    }
+}

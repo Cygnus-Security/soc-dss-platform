@@ -8,7 +8,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-socdss}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-socdss_password}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_DIR:-./runtime/postgres/data}:/var/lib/postgresql/data
+      - ${POSTGRES_BACKUP_DIR:-./runtime/postgres/backups}:/backups
     networks:
       - socdss-net
     healthcheck:
@@ -34,6 +35,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ${BACKEND_LOG_DIR:-./runtime/backend/logs}:/app/logs
+      - ${REPORT_OUTPUT_DIR:-./runtime/reports}:/app/reports
     networks:
       - socdss-net
     restart: unless-stopped
@@ -47,12 +51,11 @@ services:
       - "8080:80"
     depends_on:
       - backend
+    volumes:
+      - ${FRONTEND_LOG_DIR:-./runtime/frontend/logs}:/var/log/nginx
     networks:
       - socdss-net
     restart: unless-stopped
-
-volumes:
-  postgres_data:
 
 networks:
   socdss-net:

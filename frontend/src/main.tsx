@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ShieldCheck, Upload, ListChecks, BarChart3, Download } from 'lucide-react';
+import { ShieldCheck, Upload, ListChecks, BarChart3, Download, SlidersHorizontal } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -17,7 +17,7 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult } from './types';
+import type { CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
@@ -66,7 +66,7 @@ function scoreChartData(incidents: Incident[]) {
 }
 
 function App() {
-  const [page, setPage] = React.useState<'dashboard' | 'import' | 'incidents'>('dashboard');
+  const [page, setPage] = React.useState<'dashboard' | 'import' | 'incidents' | 'model'>('dashboard');
   const [chartView, setChartView] = React.useState<ChartView>('risk-bar');
   const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [incidents, setIncidents] = React.useState<Incident[]>([]);
@@ -139,6 +139,7 @@ function App() {
         <button className={page === 'dashboard' ? 'active' : ''} onClick={() => setPage('dashboard')}><BarChart3 size={18} /> Dashboard</button>
         <button className={page === 'import' ? 'active' : ''} onClick={() => setPage('import')}><Upload size={18} /> Import Alerts</button>
         <button className={page === 'incidents' ? 'active' : ''} onClick={() => setPage('incidents')}><ListChecks size={18} /> Incidents</button>
+        <button className={page === 'model' ? 'active' : ''} onClick={() => setPage('model')}><SlidersHorizontal size={18} /> Decision Model</button>
         <a className="download" href={api.reportUrl()}><Download size={18} /> Export CSV</a>
       </aside>
 
@@ -163,6 +164,14 @@ function App() {
               <Metric title="Total Incidents" value={summary?.totalIncidents ?? 0} />
               <Metric title="Critical" value={summary?.criticalIncidents ?? 0} />
               <Metric title="Alert Reduction" value={`${summary?.alertReductionRate ?? 0}%`} />
+            </div>
+            <div className="panel report-panel">
+              <h2>Decision Reports</h2>
+              <div className="report-actions">
+                <a href={api.reportUrl('week')}>Weekly CSV</a>
+                <a href={api.reportUrl('month')}>Monthly CSV</a>
+                <a href={api.reportUrl('year')}>Yearly CSV</a>
+              </div>
             </div>
             <div className="panel">
               <div className="panel-heading">
@@ -233,6 +242,7 @@ function App() {
         )}
 
         {page === 'import' && <ImportPage onImported={refresh} onCorrelate={handleCorrelate} />}
+        {page === 'model' && <DecisionModelPage />}
 
         {page === 'incidents' && (
           <section className="split">
@@ -317,7 +327,22 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<voi
 }
 
 function IncidentDetail({ incident }: { incident: Incident | null }) {
+  const [verdict, setVerdict] = React.useState(incident?.analystVerdict || 'Unreviewed');
+  const [decisionStatus, setDecisionStatus] = React.useState(incident?.decisionStatus || 'Open');
+  const [notes, setNotes] = React.useState(incident?.analystNotes || '');
+
+  React.useEffect(() => {
+    setVerdict(incident?.analystVerdict || 'Unreviewed');
+    setDecisionStatus(incident?.decisionStatus || 'Open');
+    setNotes(incident?.analystNotes || '');
+  }, [incident?.id]);
+
   if (!incident) return <div className="panel detail"><h2>Incident Detail</h2><p>Select an incident to view details.</p></div>;
+
+  async function saveFeedback() {
+    await api.feedback(incident!.id, { analystVerdict: verdict, decisionStatus, analystNotes: notes });
+  }
+
   return (
     <div className="panel detail">
       <h2>{incident.title}</h2>
@@ -330,13 +355,124 @@ function IncidentDetail({ incident }: { incident: Incident | null }) {
       </div>
       <h3>Recommendation</h3>
       <p className="recommendation">{incident.recommendation}</p>
+      {incident.decisionAdvice && (
+        <>
+          <h3>Decision Support</h3>
+          <div className="decision-box">
+            <div><span>Priority</span><strong>{incident.decisionAdvice.priority}</strong></div>
+            <div><span>SLA</span><strong>{incident.decisionAdvice.slaHours}h</strong></div>
+            <div><span>Confidence</span><strong>{Math.round(incident.decisionAdvice.confidence * 100)}%</strong></div>
+          </div>
+          <p>{incident.decisionAdvice.rationale}</p>
+          <p className="recommendation">{incident.decisionAdvice.escalation}</p>
+          <ul className="alerts-list">
+            {incident.decisionAdvice.nextActions.map(action => <li key={action}>{action}</li>)}
+          </ul>
+        </>
+      )}
       <h3>Explanation</h3>
       <p>{incident.explanation}</p>
+      <h3>Decision Factors</h3>
+      <div className="factor-list">
+        {incident.riskFactors?.map(f => (
+          <div className="factor" key={f.name}>
+            <div><strong>{f.name}</strong><span>{f.reason}</span></div>
+            <b>{f.contribution}</b>
+          </div>
+        ))}
+      </div>
+      <h3>Analyst Feedback</h3>
+      <div className="feedback-form">
+        <select value={verdict} onChange={e => setVerdict(e.target.value)}>
+          <option>Unreviewed</option>
+          <option>True Positive</option>
+          <option>False Positive</option>
+          <option>Benign</option>
+        </select>
+        <select value={decisionStatus} onChange={e => setDecisionStatus(e.target.value)}>
+          <option>Open</option>
+          <option>Escalated</option>
+          <option>Resolved</option>
+          <option>Suppressed</option>
+        </select>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Analyst notes" />
+        <button onClick={saveFeedback}>Save Feedback</button>
+      </div>
       <h3>Related Alerts</h3>
       <ul className="alerts-list">
         {incident.relatedAlerts?.map(a => <li key={a.id}>[{a.wazuhRuleLevel}] {a.description}</li>)}
       </ul>
     </div>
+  );
+}
+
+function DecisionModelPage() {
+  const [model, setModel] = React.useState<RiskModel | null>(null);
+  const [whatIf, setWhatIf] = React.useState<WhatIfRequest>({
+    assetCriticality: 'High',
+    exposure: 'Public',
+    alertCount: 5,
+    maxRuleLevel: 10,
+    mitreTactic: 'Initial Access',
+    vulnerabilityContext: false
+  });
+  const [result, setResult] = React.useState<RiskAssessmentResult | null>(null);
+
+  React.useEffect(() => {
+    api.riskModel().then(setModel).catch(console.error);
+  }, []);
+
+  async function saveModel() {
+    if (model) setModel(await api.updateRiskModel(model));
+  }
+
+  async function runWhatIf() {
+    setResult(await api.whatIf(whatIf));
+  }
+
+  if (!model) return <section className="panel"><h2>Decision Model</h2><p>Loading model...</p></section>;
+
+  return (
+    <section className="split">
+      <div className="panel">
+        <h2>Risk Criteria Weights</h2>
+        <Weight label="Severity" value={model.severityWeight} onChange={v => setModel({ ...model, severityWeight: v })} />
+        <Weight label="Asset Criticality" value={model.assetWeight} onChange={v => setModel({ ...model, assetWeight: v })} />
+        <Weight label="Frequency" value={model.frequencyWeight} onChange={v => setModel({ ...model, frequencyWeight: v })} />
+        <Weight label="MITRE" value={model.mitreWeight} onChange={v => setModel({ ...model, mitreWeight: v })} />
+        <Weight label="Exposure" value={model.exposureWeight} onChange={v => setModel({ ...model, exposureWeight: v })} />
+        <Weight label="Vulnerability" value={model.vulnerabilityWeight} onChange={v => setModel({ ...model, vulnerabilityWeight: v })} />
+        <div className="actions"><button onClick={saveModel}>Save Model</button></div>
+      </div>
+      <div className="panel">
+        <h2>What-if Analysis</h2>
+        <div className="whatif-grid">
+          <select value={whatIf.assetCriticality} onChange={e => setWhatIf({ ...whatIf, assetCriticality: e.target.value })}>
+            <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+          </select>
+          <select value={whatIf.exposure} onChange={e => setWhatIf({ ...whatIf, exposure: e.target.value })}>
+            <option>Internal</option><option>Public</option>
+          </select>
+          <input type="number" value={whatIf.alertCount} onChange={e => setWhatIf({ ...whatIf, alertCount: Number(e.target.value) })} />
+          <input type="number" value={whatIf.maxRuleLevel} onChange={e => setWhatIf({ ...whatIf, maxRuleLevel: Number(e.target.value) })} />
+          <select value={whatIf.mitreTactic} onChange={e => setWhatIf({ ...whatIf, mitreTactic: e.target.value })}>
+            <option>Reconnaissance</option><option>Initial Access</option><option>Credential Access</option><option>Impact</option>
+          </select>
+          <label className="check"><input type="checkbox" checked={whatIf.vulnerabilityContext} onChange={e => setWhatIf({ ...whatIf, vulnerabilityContext: e.target.checked })} /> Vulnerability context</label>
+        </div>
+        <div className="actions"><button onClick={runWhatIf}>Run What-if</button></div>
+        {result && <div className="result">Score {result.score} / {result.level}</div>}
+      </div>
+    </section>
+  );
+}
+
+function Weight({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="weight-row">
+      <span>{label}</span>
+      <input type="number" min="0" step="0.05" value={value} onChange={e => onChange(Number(e.target.value))} />
+    </label>
   );
 }
 

@@ -37,12 +37,17 @@ public class Incident {
     private Instant lastSeen;
     private String mitreTactic;
     private String mitreTechnique;
+    private String analystVerdict;
+    private String decisionStatus;
 
     @Column(columnDefinition = "TEXT")
     private String recommendation;
 
     @Column(columnDefinition = "TEXT")
     private String explanation;
+
+    @Column(columnDefinition = "TEXT")
+    private String analystNotes;
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
@@ -83,10 +88,16 @@ public class Incident {
     public void setMitreTactic(String mitreTactic) { this.mitreTactic = mitreTactic; }
     public String getMitreTechnique() { return mitreTechnique; }
     public void setMitreTechnique(String mitreTechnique) { this.mitreTechnique = mitreTechnique; }
+    public String getAnalystVerdict() { return analystVerdict; }
+    public void setAnalystVerdict(String analystVerdict) { this.analystVerdict = analystVerdict; }
+    public String getDecisionStatus() { return decisionStatus; }
+    public void setDecisionStatus(String decisionStatus) { this.decisionStatus = decisionStatus; }
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
     public String getExplanation() { return explanation; }
     public void setExplanation(String explanation) { this.explanation = explanation; }
+    public String getAnalystNotes() { return analystNotes; }
+    public void setAnalystNotes(String analystNotes) { this.analystNotes = analystNotes; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Set<SecurityAlert> getAlerts() { return alerts; }
