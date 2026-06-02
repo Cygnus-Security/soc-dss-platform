@@ -4,6 +4,14 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
 const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+type ReportRange = {
+  from?: string;
+  to?: string;
+};
+
+let csrfToken: string | null = null;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase();
@@ -23,6 +31,19 @@ function mergeImportResult(total: ImportResult, next: ImportResult) {
   total.totalLines += next.totalLines;
   total.importedAlerts += next.importedAlerts;
   total.skippedLines += next.skippedLines;
+}
+
+function storeAuthStatus(status: AuthStatus) {
+  csrfToken = status.csrfToken ?? null;
+  return status;
+}
+
+function reportQuery(range?: ReportRange) {
+  if (!range?.from || !range?.to) {
+    return '';
+  }
+  const params = new URLSearchParams({ from: range.from, to: range.to });
+  return `?${params.toString()}`;
 }
 
 async function importAlertBatch(lines: string[], batchNumber: number): Promise<ImportResult> {
