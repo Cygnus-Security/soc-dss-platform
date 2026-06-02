@@ -6,6 +6,11 @@ const UPLOAD_BATCH_CHARS = 512 * 1024;
 const STRUCTURED_JSON_SAMPLE_BYTES = 16 * 1024;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+type ReportRange = {
+  from?: string;
+  to?: string;
+};
+
 let csrfToken: string | null = null;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
