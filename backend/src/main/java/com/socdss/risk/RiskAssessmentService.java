@@ -5,13 +5,16 @@ import com.socdss.asset.Asset;
 import com.socdss.asset.AssetRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class RiskAssessmentService {
     private final AssetRepository assetRepository;
+    private final RiskModelConfigRepository configRepository;
 
     private static final Map<String, Integer> CRITICALITY_SCORE = Map.of(
             "Low", 25,
@@ -41,8 +44,9 @@ public class RiskAssessmentService {
             Map.entry("Impact", 95)
     );
 
-    public RiskAssessmentService(AssetRepository assetRepository) {
+    public RiskAssessmentService(AssetRepository assetRepository, RiskModelConfigRepository configRepository) {
         this.assetRepository = assetRepository;
+        this.configRepository = configRepository;
     }
 
     public RiskAssessmentResult assess(List<SecurityAlert> alerts) {
@@ -61,13 +65,35 @@ public class RiskAssessmentService {
         double exposureScore = EXPOSURE_SCORE.getOrDefault(asset.exposure(), 50);
         double vulnerabilityScore = containsVulnerabilityContext(alerts) ? 80.0 : 0.0;
 
-        double score =
-                0.30 * severityScore +
-                0.20 * assetScore +
-                0.15 * frequencyScore +
-                0.15 * mitreScore +
-                0.10 * exposureScore +
-                0.10 * vulnerabilityScore;
+        RiskModelDto model = currentModel();
+        List<RiskFactor> factors = factors(
+                severityScore,
+                model.severityWeight(),
+                "Wazuh/AMiner severity",
+                "Maximum normalized rule level is " + maxRuleLevel,
+                assetScore,
+                model.assetWeight(),
+                "Asset criticality",
+                "Target asset criticality is " + asset.criticality(),
+                frequencyScore,
+                model.frequencyWeight(),
+                "Alert frequency",
+                alerts.size() + " related alerts are grouped into this incident",
+                mitreScore,
+                model.mitreWeight(),
+                "MITRE tactic",
+                "Representative tactic is " + blankToDefault(representative.getMitreTactic(), "N/A"),
+                exposureScore,
+                model.exposureWeight(),
+                "Asset exposure",
+                "Asset exposure is " + asset.exposure(),
+                vulnerabilityScore,
+                model.vulnerabilityWeight(),
+                "Vulnerability context",
+                vulnerabilityScore > 0 ? "CVE/vulnerability terms detected" : "No vulnerability terms detected"
+        );
+
+        double score = factors.stream().mapToDouble(RiskFactor::contribution).sum();
 
         double rounded = Math.round(score * 100.0) / 100.0;
         String level = riskLevel(rounded);
@@ -83,7 +109,86 @@ public class RiskAssessmentService {
                 vulnerabilityScore > 0 ? "present" : "not detected"
         );
 
-        return new RiskAssessmentResult(rounded, level, explanation);
+        return new RiskAssessmentResult(rounded, level, explanation, factors);
+    }
+
+    public RiskAssessmentResult assessWhatIf(WhatIfRequest request) {
+        int maxRuleLevel = request.maxRuleLevel() == null ? 6 : clamp(request.maxRuleLevel(), 0, 16);
+        int alertCount = request.alertCount() == null ? 1 : clamp(request.alertCount(), 1, 1000);
+        String criticality = blankToDefault(request.assetCriticality(), "Medium");
+        String exposure = blankToDefault(request.exposure(), "Internal");
+        String tactic = blankToDefault(request.mitreTactic(), "");
+        boolean vulnerability = Boolean.TRUE.equals(request.vulnerabilityContext());
+
+        double severityScore = Math.min((maxRuleLevel / 16.0) * 100.0, 100.0);
+        double assetScore = CRITICALITY_SCORE.getOrDefault(criticality, 50);
+        double frequencyScore = Math.min(alertCount * 10.0, 100.0);
+        double mitreScore = TACTIC_WEIGHT.getOrDefault(tactic, 35);
+        double exposureScore = EXPOSURE_SCORE.getOrDefault(exposure, 50);
+        double vulnerabilityScore = vulnerability ? 80.0 : 0.0;
+        RiskModelDto model = currentModel();
+
+        List<RiskFactor> factors = factors(
+                severityScore, model.severityWeight(), "Severity", "Simulated max rule level is " + maxRuleLevel,
+                assetScore, model.assetWeight(), "Asset criticality", "Simulated criticality is " + criticality,
+                frequencyScore, model.frequencyWeight(), "Alert frequency", "Simulated related alert count is " + alertCount,
+                mitreScore, model.mitreWeight(), "MITRE tactic", "Simulated tactic is " + blankToDefault(tactic, "N/A"),
+                exposureScore, model.exposureWeight(), "Exposure", "Simulated exposure is " + exposure,
+                vulnerabilityScore, model.vulnerabilityWeight(), "Vulnerability context", vulnerability ? "Present" : "Not detected"
+        );
+        double score = Math.round(factors.stream().mapToDouble(RiskFactor::contribution).sum() * 100.0) / 100.0;
+        return new RiskAssessmentResult(score, riskLevel(score), "What-if score based on simulated decision criteria.", factors);
+    }
+
+    public RiskModelDto currentModel() {
+        return RiskModelDto.from(configRepository.findAll().stream().findFirst().orElseGet(this::defaultConfig));
+    }
+
+    public RiskModelDto updateModel(RiskModelDto dto) {
+        RiskModelConfig config = configRepository.findAll().stream().findFirst().orElseGet(this::defaultConfig);
+        config.setSeverityWeight(safeWeight(dto.severityWeight()));
+        config.setAssetWeight(safeWeight(dto.assetWeight()));
+        config.setFrequencyWeight(safeWeight(dto.frequencyWeight()));
+        config.setMitreWeight(safeWeight(dto.mitreWeight()));
+        config.setExposureWeight(safeWeight(dto.exposureWeight()));
+        config.setVulnerabilityWeight(safeWeight(dto.vulnerabilityWeight()));
+        config.setUpdatedAt(Instant.now());
+        return RiskModelDto.from(configRepository.save(config));
+    }
+
+    private RiskModelConfig defaultConfig() {
+        return configRepository.save(new RiskModelConfig());
+    }
+
+    private double safeWeight(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+        return Math.min(Math.max(value, 0.0), 10.0);
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private List<RiskFactor> factors(Object... values) {
+        double totalWeight = 0.0;
+        for (int i = 1; i < values.length; i += 4) {
+            totalWeight += (double) values[i];
+        }
+        if (totalWeight <= 0) {
+            totalWeight = 1.0;
+        }
+        List<RiskFactor> factors = new ArrayList<>();
+        for (int i = 0; i < values.length; i += 4) {
+            double rawScore = (double) values[i];
+            double normalizedWeight = (double) values[i + 1] / totalWeight;
+            String name = (String) values[i + 2];
+            String reason = (String) values[i + 3];
+            double contribution = Math.round(rawScore * normalizedWeight * 100.0) / 100.0;
+            factors.add(new RiskFactor(name, rawScore, Math.round(normalizedWeight * 100.0) / 100.0, contribution, reason));
+        }
+        return factors;
     }
 
     private AssetContext resolveAsset(SecurityAlert alert) {

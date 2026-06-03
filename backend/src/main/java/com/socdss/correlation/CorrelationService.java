@@ -7,6 +7,7 @@ import com.socdss.incident.IncidentRepository;
 import com.socdss.recommendation.RecommendationService;
 import com.socdss.risk.RiskAssessmentResult;
 import com.socdss.risk.RiskAssessmentService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,22 +16,72 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class CorrelationService {
+    private static final int RELATED_ALERT_SAMPLE_LIMIT = 100;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final AtomicReference<CorrelationJobStatus> jobStatus = new AtomicReference<>(
+            new CorrelationJobStatus("IDLE", null, null, null, "No correlation job has run yet.")
+    );
+
     private final SecurityAlertRepository alertRepository;
     private final IncidentRepository incidentRepository;
     private final RiskAssessmentService riskAssessmentService;
     private final RecommendationService recommendationService;
+    private final long timeWindowMinutes;
 
     public CorrelationService(SecurityAlertRepository alertRepository,
                               IncidentRepository incidentRepository,
                               RiskAssessmentService riskAssessmentService,
-                              RecommendationService recommendationService) {
+                              RecommendationService recommendationService,
+                              @Value("${app.correlation.time-window-minutes:15}") long timeWindowMinutes) {
         this.alertRepository = alertRepository;
         this.incidentRepository = incidentRepository;
         this.riskAssessmentService = riskAssessmentService;
         this.recommendationService = recommendationService;
+        this.timeWindowMinutes = timeWindowMinutes;
+    }
+
+    public CorrelationJobStatus startCorrelationJob() {
+        CorrelationJobStatus current = jobStatus.get();
+        if ("RUNNING".equals(current.status())) {
+            return current;
+        }
+
+        CorrelationJobStatus started = new CorrelationJobStatus("RUNNING", Instant.now(), null, null, "Correlation is running.");
+        jobStatus.set(started);
+
+        executor.submit(() -> {
+            try {
+                int incidentCount = correlateAll().size();
+                jobStatus.set(new CorrelationJobStatus(
+                        "COMPLETED",
+                        started.startedAt(),
+                        Instant.now(),
+                        incidentCount,
+                        "Correlation completed successfully."
+                ));
+            } catch (Exception e) {
+                jobStatus.set(new CorrelationJobStatus(
+                        "FAILED",
+                        started.startedAt(),
+                        Instant.now(),
+                        null,
+                        e.getMessage()
+                ));
+            }
+        });
+
+        return started;
+    }
+
+    public CorrelationJobStatus jobStatus() {
+        return jobStatus.get();
     }
 
     @Transactional
@@ -54,7 +105,14 @@ public class CorrelationService {
     }
 
     private String correlationKey(SecurityAlert alert) {
-        return safe(alert.getAgentName()) + "|" + safe(alert.getSourceIp()) + "|" + safe(alert.getIncidentType());
+        long window = correlationWindow(alert.getEventTimestamp());
+        return safe(alert.getAgentName()) + "|" + safe(alert.getSourceIp()) + "|" + safe(alert.getIncidentType()) + "|" + window;
+    }
+
+    private long correlationWindow(Instant timestamp) {
+        long windowSeconds = Math.max(timeWindowMinutes, 1) * 60;
+        long epochSecond = (timestamp == null ? Instant.now() : timestamp).getEpochSecond();
+        return epochSecond / windowSeconds;
     }
 
     private Incident buildIncident(List<SecurityAlert> relatedAlerts) {
@@ -92,8 +150,8 @@ public class CorrelationService {
         incident.setRiskScore(risk.score());
         incident.setRiskLevel(risk.level());
         incident.setExplanation(risk.explanation());
-        incident.setRecommendation(recommendationService.recommend(first.getIncidentType(), risk.level()));
-        incident.getAlerts().addAll(relatedAlerts);
+        incident.setRecommendation(recommendationService.recommend(first.getIncidentType(), risk.level(), first.getMitreTactic(), first.getAgentName()));
+        incident.getAlerts().addAll(relatedAlerts.stream().limit(RELATED_ALERT_SAMPLE_LIMIT).toList());
         return incident;
     }
 

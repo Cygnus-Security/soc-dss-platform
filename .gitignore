@@ -34,6 +34,7 @@ data/results/*.json
 # Docker
 *.pid
 deploy/wazuh-lab/runtime/
+deploy/production/runtime/
 
 # Temporary
 /tmp/

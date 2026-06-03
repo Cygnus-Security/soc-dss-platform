@@ -24,7 +24,8 @@ public class CorsConfig {
                                 .filter(origin -> !origin.isBlank())
                                 .toArray(String[]::new))
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("*");
+                        .allowedHeaders("*")
+                        .allowCredentials(!allowedOrigins.contains("*"));
             }
         };
     }
