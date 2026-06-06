@@ -39,3 +39,5 @@ deploy/production/runtime/
 # Temporary
 /tmp/
 *.tmp
+
+*/DSS-SOC
