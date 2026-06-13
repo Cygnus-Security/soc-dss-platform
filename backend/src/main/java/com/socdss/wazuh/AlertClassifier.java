@@ -8,7 +8,17 @@ public class AlertClassifier {
                 (description == null ? "" : description) + " " +
                 (groups == null ? "" : groups)).toLowerCase();
 
-        if (containsAny(text, "sshd", "authentication", "invalid user", "login failed", "brute", "5710", "5712")) {
+        // SOAR alerts — check rule ID trước để ưu tiên cao nhất
+        if (text.contains("soar-xss"))   return "XSS Attack";
+        if (text.contains("soar-sqli"))  return "SQL Injection Attack";
+        if (text.contains("soar-lfi"))   return "Local File Inclusion Attack";
+        if (text.contains("soar-cmdi"))  return "Command Injection Attack";
+        if (text.contains("soar-brute")) return "Brute Force Attack";
+        if (text.contains("soar-recon")) return "Reconnaissance / Network Scan";
+        if (text.contains("soar-"))      return "Web Attack";
+
+        // Wazuh alerts gốc — bỏ "authentication" khỏi SSH check
+        if (containsAny(text, "sshd", "invalid user", "login failed", "brute", "5710", "5712")) {
             return "SSH Brute Force / Authentication Attack";
         }
         if (containsAny(text, "syscheck", "fim", "integrity", "file added", "file modified", "webshell")) {
@@ -19,6 +29,9 @@ public class AlertClassifier {
         }
         if (containsAny(text, "sql injection", "xss", "web attack", "apache", "nginx", "http", "directory traversal")) {
             return "Web Attack";
+        }
+        if (containsAny(text, "authentication", "login failed", "brute force")) {
+            return "SSH Brute Force / Authentication Attack";
         }
         if (containsAny(text, "nmap", "scan", "recon", "suricata")) {
             return "Reconnaissance / Network Scan";
