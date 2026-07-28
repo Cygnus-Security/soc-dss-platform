@@ -1,0 +1,164 @@
+% ==========================
+% FORMAT CHUẨN LUẬN VĂN THẠC SĨ
+% ==========================
+
+% Fix clear double page
+\makeatletter
+\def\cleardoublepage{\clearpage}
+\makeatother
+
+% ==========================
+% FONT + VIETNAMESE
+% ==========================
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+\setmainfont{Times New Roman}
+
+% ==========================
+% LAYOUT
+% ==========================
+\usepackage{geometry}
+\geometry{
+  top=3.5cm,
+  bottom=3.0cm,
+  left=3.5cm,
+  right=2.5cm
+}
+
+\usepackage{setspace}
+\usepackage{indentfirst}
+\setlength{\parskip}{3pt}
+
+% ==========================
+% TITLES
+% ==========================
+\usepackage{titlesec}
+\usepackage{textcase}
+
+% ----- CHAPTER -----
+\titleformat{\chapter}
+  {\centering\bfseries\fontsize{16pt}{20pt}\selectfont}
+  {CHƯƠNG \thechapter:}{1em}{\MakeTextUppercase}
+
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+% ----- SECTION -----
+\titleformat{\section}
+  {\bfseries\fontsize{14pt}{16pt}\selectfont}
+  {\thesection.}{1em}{}
+
+% ----- SUBSECTION -----
+\titleformat{\subsection}
+  {\itshape\bfseries\fontsize{13pt}{15pt}\selectfont}
+  {\thesubsection.}{1em}{}
+
+% ==========================
+% PACKAGES
+% ==========================
+% \usepackage{transparent}
+% \usepackage{svg}
+\usepackage{needspace}
+\usepackage{makecell}
+\usepackage{ragged2e}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{placeins}
+\usepackage{anyfontsize}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tocloft}
+\usepackage{plantuml}
+\usepackage{pgf-umlsd}
+\usepackage{pdflscape}
+
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\Centering\arraybackslash}p{#1}}
+\newcommand{\codepath}[1]{\begingroup\footnotesize\path{#1}\endgroup}
+\emergencystretch=2em
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes, matrix, shapes.multipart, fit}
+\usepackage{tikzpagenodes}
+
+% ==========================
+% TOC (MỤC LỤC)
+% ==========================
+
+% Title
+\renewcommand{\contentsname}{\MakeUppercase{Mục lục}}
+\renewcommand{\cfttoctitlefont}{\hfill\bfseries\fontsize{16pt}{20pt}\selectfont}
+\renewcommand{\cftaftertoctitle}{\hfill}
+
+% Dots
+\renewcommand{\cftdotsep}{1.5}
+\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftsubsecleader}{\cftdotfill{\cftdotsep}}
+
+% Chapter format in TOC
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftchappagefont}{\bfseries}
+\renewcommand{\cftchappresnum}{CHƯƠNG~}
+\renewcommand{\cftchapaftersnum}{: }
+\renewcommand{\cftchapnumwidth}{6em}
+
+% ÉP VIẾT HOA CHAPTER TRONG TOC (CÁCH ĐÚNG)
+\renewcommand{\cftchapfont}{\bfseries\MakeTextUppercase}
+
+% Section
+\renewcommand{\cftsecfont}{\normalfont}
+\renewcommand{\cftsecnumwidth}{2.5em}
+
+% Subsection
+\renewcommand{\cftsubsecfont}{\normalfont}
+\renewcommand{\cftsubsecnumwidth}{3em}
+% Subsubsection
+\renewcommand{\cftsubsubsecfont}{\normalfont}
+\renewcommand{\cftsubsubsecnumwidth}{3.5em}
+
+% Indent
+% \setlength{\cftsecindent}{0em}
+% \setlength{\cftsubsecindent}{2em}
+% \setlength{\cftsubsubsecindent}{4em}
+
+\setlength{\cftsecindent}{0em}
+\setlength{\cftsubsecindent}{1.5em}
+\setlength{\cftsubsubsecindent}{3em}
+
+% Spacing
+\setlength{\cftbeforetoctitleskip}{-1em}
+\setlength{\cftaftertoctitleskip}{2em}
+\setlength{\cftbeforechapskip}{0.5em}
+
+% ==========================
+% HEADER / FOOTER
+% ==========================
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ==========================
+% HYPERREF (cuối cùng)
+% ==========================
+\usepackage[hidelinks]{hyperref}
+
+\pdfstringdefDisableCommands{%
+  \def\MakeTextUppercase#1{#1}%
+}
+
+% \pdfstringdefDisableCommands{%
+%   \def\MakeTextUppercase##1{##1}%
+% }
