@@ -17,7 +17,7 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, ResponseAction, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
@@ -316,7 +316,7 @@ function App() {
                 </tbody>
               </table>
             </div>
-            <IncidentDetail incident={selectedIncident} />
+            <IncidentDetail incident={selectedIncident} actor={auth.username || 'admin'} />
           </section>
         )}
       </main>
@@ -452,21 +452,54 @@ function ImportPage({ onImported, onCorrelate }: { onImported: () => Promise<voi
   );
 }
 
-function IncidentDetail({ incident }: { incident: Incident | null }) {
+function IncidentDetail({ incident, actor }: { incident: Incident | null; actor: string }) {
   const [verdict, setVerdict] = React.useState(incident?.analystVerdict || 'Unreviewed');
   const [decisionStatus, setDecisionStatus] = React.useState(incident?.decisionStatus || 'Open');
   const [notes, setNotes] = React.useState(incident?.analystNotes || '');
+  const [actions, setActions] = React.useState<ResponseAction[]>([]);
+  const [actionMessage, setActionMessage] = React.useState('');
 
   React.useEffect(() => {
     setVerdict(incident?.analystVerdict || 'Unreviewed');
     setDecisionStatus(incident?.decisionStatus || 'Open');
     setNotes(incident?.analystNotes || '');
+    setActions([]);
+    if (incident?.id) api.responseActions(incident.id).then(setActions).catch(console.error);
   }, [incident?.id]);
 
   if (!incident) return <div className="panel detail"><h2>Incident Detail</h2><p>Select an incident to view details.</p></div>;
 
   async function saveFeedback() {
     await api.feedback(incident!.id, { analystVerdict: verdict, decisionStatus, analystNotes: notes });
+  }
+
+  async function requestTemporaryBlock() {
+    setActionMessage('');
+    try {
+      const action = await api.createResponseAction(
+        incident!.id,
+        'temporary_ip_block',
+        incident!.sourceIp,
+        `Temporary containment requested for ${incident!.title}`,
+        actor
+      );
+      setActions(current => [action, ...current]);
+      setActionMessage('Action is pending approval.');
+    } catch {
+      setActionMessage('Unable to create response action.');
+    }
+  }
+
+  async function decideAction(action: ResponseAction, approve: boolean) {
+    try {
+      const updated = approve
+        ? await api.approveResponseAction(incident!.id, action.id, actor)
+        : await api.rejectResponseAction(incident!.id, action.id, actor, 'Rejected by analyst');
+      setActions(current => current.map(item => item.id === updated.id ? updated : item));
+      setActionMessage(approve ? 'Action dispatched to SOAR.' : 'Action rejected.');
+    } catch {
+      setActionMessage('Action decision failed. Kafka may be disabled or the action was already decided.');
+    }
   }
 
   return (
@@ -524,6 +557,24 @@ function IncidentDetail({ incident }: { incident: Incident | null }) {
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Analyst notes" />
         <button onClick={saveFeedback}>Save Feedback</button>
       </div>
+      <h3>Response Approval</h3>
+      <p>Infrastructure-changing actions require an explicit analyst decision.</p>
+      <div className="actions"><button onClick={requestTemporaryBlock}>Request Temporary IP Block</button></div>
+      {actionMessage && <div className="notice">{actionMessage}</div>}
+      <ul className="alerts-list">
+        {actions.map(action => (
+          <li key={action.id}>
+            <strong>{action.actionType}</strong> → {action.target} — {action.status}
+            {action.resultMessage && <> — {action.resultMessage}</>}
+            {action.status === 'PENDING_APPROVAL' && (
+              <span className="actions">
+                <button onClick={() => decideAction(action, true)}>Approve</button>
+                <button onClick={() => decideAction(action, false)}>Reject</button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
       <h3>Related Alerts</h3>
       <ul className="alerts-list">
         {incident.relatedAlerts?.map(a => <li key={a.id}>[{a.wazuhRuleLevel}] {a.description}</li>)}

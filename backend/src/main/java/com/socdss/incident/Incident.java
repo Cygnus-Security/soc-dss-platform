@@ -39,6 +39,7 @@ public class Incident {
     private String mitreTechnique;
     private String analystVerdict;
     private String decisionStatus;
+    private String correlationKey;
 
     @Column(columnDefinition = "TEXT")
     private String recommendation;
@@ -92,6 +93,8 @@ public class Incident {
     public void setAnalystVerdict(String analystVerdict) { this.analystVerdict = analystVerdict; }
     public String getDecisionStatus() { return decisionStatus; }
     public void setDecisionStatus(String decisionStatus) { this.decisionStatus = decisionStatus; }
+    public String getCorrelationKey() { return correlationKey; }
+    public void setCorrelationKey(String correlationKey) { this.correlationKey = correlationKey; }
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
     public String getExplanation() { return explanation; }

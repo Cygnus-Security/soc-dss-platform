@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soc-dss.local/contracts/action-result-v1.schema.json",
+  "title": "Action Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action_id", "action_type", "target", "status", "message", "completed_at", "details"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "action_id": {"type": "string", "format": "uuid"},
+    "incident_id": {"type": ["integer", "null"], "minimum": 1},
+    "action_type": {"type": "string", "minLength": 1, "maxLength": 64},
+    "target": {"type": "string", "minLength": 1, "maxLength": 255},
+    "status": {"enum": ["EXECUTED", "FAILED", "DRY_RUN"]},
+    "message": {"type": "string", "maxLength": 4000},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "details": {"type": "object"}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "event_id": "ef82f33b9a494fae87ef21c22fd8be5f",
+  "tenant_id": "lab",
+  "source_type": "ids",
+  "source_product": "suricata",
+  "external_id": "suricata-20261008-000001",
+  "observed_at": "2026-10-08T03:30:00Z",
+  "ingested_at": "2026-10-08T03:30:05Z",
+  "event_type": "authentication_bypass_attempt",
+  "source_severity": 10,
+  "severity": 75,
+  "confidence": 0.97,
+  "asset_id": "asset-001",
+  "source_ip": "192.0.2.10",
+  "destination_ip": "192.0.2.20",
+  "user_id": null,
+  "session_id": "session-001",
+  "mitre_techniques": ["T1190"],
+  "cve_ids": [],
+  "evidence": ["sqli_pattern_detected"],
+  "raw_reference": "wazuh-index:wazuh-alerts-2026.10.08/document-001",
+  "normalizer_version": "translator-1.0.0",
+  "metadata": {
+    "source_rule_id": "100001"
+  }
+}

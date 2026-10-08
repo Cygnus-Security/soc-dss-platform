@@ -16,6 +16,19 @@ public class SecurityAlert {
     private String source = "Wazuh";
 
     private String externalId;
+    private String tenantId;
+    private String eventId;
+    private String schemaVersion;
+    private Instant ingestedAt;
+    private Double normalizedSeverity;
+    private Double confidence;
+    private String rawReference;
+    private String normalizerVersion;
+
+    @Column(columnDefinition = "TEXT")
+    private String metadataJson;
+
+    private String ingestionStatus;
     private String wazuhRuleId;
 
     @Column(nullable = false)
@@ -47,6 +60,26 @@ public class SecurityAlert {
     public void setSource(String source) { this.source = source; }
     public String getExternalId() { return externalId; }
     public void setExternalId(String externalId) { this.externalId = externalId; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+    public String getEventId() { return eventId; }
+    public void setEventId(String eventId) { this.eventId = eventId; }
+    public String getSchemaVersion() { return schemaVersion; }
+    public void setSchemaVersion(String schemaVersion) { this.schemaVersion = schemaVersion; }
+    public Instant getIngestedAt() { return ingestedAt; }
+    public void setIngestedAt(Instant ingestedAt) { this.ingestedAt = ingestedAt; }
+    public Double getNormalizedSeverity() { return normalizedSeverity; }
+    public void setNormalizedSeverity(Double normalizedSeverity) { this.normalizedSeverity = normalizedSeverity; }
+    public Double getConfidence() { return confidence; }
+    public void setConfidence(Double confidence) { this.confidence = confidence; }
+    public String getRawReference() { return rawReference; }
+    public void setRawReference(String rawReference) { this.rawReference = rawReference; }
+    public String getNormalizerVersion() { return normalizerVersion; }
+    public void setNormalizerVersion(String normalizerVersion) { this.normalizerVersion = normalizerVersion; }
+    public String getMetadataJson() { return metadataJson; }
+    public void setMetadataJson(String metadataJson) { this.metadataJson = metadataJson; }
+    public String getIngestionStatus() { return ingestionStatus; }
+    public void setIngestionStatus(String ingestionStatus) { this.ingestionStatus = ingestionStatus; }
     public String getWazuhRuleId() { return wazuhRuleId; }
     public void setWazuhRuleId(String wazuhRuleId) { this.wazuhRuleId = wazuhRuleId; }
     public Integer getWazuhRuleLevel() { return wazuhRuleLevel; }

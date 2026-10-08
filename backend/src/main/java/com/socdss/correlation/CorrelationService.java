@@ -86,8 +86,6 @@ public class CorrelationService {
 
     @Transactional
     public List<Incident> correlateAll() {
-        incidentRepository.deleteAll();
-
         List<SecurityAlert> alerts = alertRepository.findAll();
         Map<String, List<SecurityAlert>> groups = new HashMap<>();
 
@@ -96,8 +94,8 @@ public class CorrelationService {
             groups.computeIfAbsent(key, ignored -> new java.util.ArrayList<>()).add(alert);
         }
 
-        List<Incident> incidents = groups.values().stream()
-                .map(this::buildIncident)
+        List<Incident> incidents = groups.entrySet().stream()
+                .map(entry -> buildIncident(entry.getKey(), entry.getValue()))
                 .sorted(Comparator.comparing(Incident::getRiskScore).reversed())
                 .toList();
 
@@ -115,7 +113,7 @@ public class CorrelationService {
         return epochSecond / windowSeconds;
     }
 
-    private Incident buildIncident(List<SecurityAlert> relatedAlerts) {
+    private Incident buildIncident(String correlationKey, List<SecurityAlert> relatedAlerts) {
         SecurityAlert first = relatedAlerts.get(0);
         RiskAssessmentResult risk = riskAssessmentService.assess(relatedAlerts);
 
@@ -136,7 +134,8 @@ public class CorrelationService {
                 .max(Comparator.naturalOrder())
                 .orElse(0);
 
-        Incident incident = new Incident();
+        Incident incident = incidentRepository.findByCorrelationKey(correlationKey).orElseGet(Incident::new);
+        incident.setCorrelationKey(correlationKey);
         incident.setIncidentType(first.getIncidentType());
         incident.setTitle(first.getIncidentType() + " on " + safe(first.getAgentName()));
         incident.setSourceIp(first.getSourceIp());
@@ -151,6 +150,7 @@ public class CorrelationService {
         incident.setRiskLevel(risk.level());
         incident.setExplanation(risk.explanation());
         incident.setRecommendation(recommendationService.recommend(first.getIncidentType(), risk.level(), first.getMitreTactic(), first.getAgentName()));
+        incident.getAlerts().clear();
         incident.getAlerts().addAll(relatedAlerts.stream().limit(RELATED_ALERT_SAMPLE_LIMIT).toList());
         return incident;
     }

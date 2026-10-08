@@ -1,4 +1,88 @@
 services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: soc-dss-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    volumes:
+      - ${REDPANDA_DATA_DIR:-./runtime/redpanda/data}:/var/lib/redpanda/data
+    networks:
+      - socdss-net
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health -X brokers=redpanda:9092 | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redpanda-init:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: soc-dss-redpanda-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        for topic in \
+          soc.raw.v1 \
+          soc.normalized.v1 \
+          soc.behavior.v1 \
+          soc.incident-candidate.v1 \
+          soc.decision-feedback.v1 \
+          soc.action-approved.v1 \
+          soc.action-result.v1 \
+          soc.dlq.v1; do
+          if ! rpk topic create "$${topic}" \
+            -X brokers=redpanda:9092 \
+            --partitions 6 \
+            --replicas 1; then
+            rpk topic describe "$${topic}" -X brokers=redpanda:9092 >/dev/null
+          fi
+        done
+        rpk topic alter-config soc.raw.v1 -X brokers=redpanda:9092 --set retention.ms=604800000
+        for topic in soc.normalized.v1 soc.behavior.v1 soc.incident-candidate.v1 soc.action-approved.v1 soc.dlq.v1; do
+          rpk topic alter-config "$${topic}" -X brokers=redpanda:9092 --set retention.ms=2592000000
+        done
+        for topic in soc.decision-feedback.v1 soc.action-result.v1; do
+          rpk topic alter-config "$${topic}" -X brokers=redpanda:9092 --set retention.ms=7776000000
+        done
+    networks:
+      - socdss-net
+    restart: "no"
+
+  redpanda-console:
+    image: redpandadata/console:v2.7.2
+    container_name: soc-dss-redpanda-console
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8082:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - socdss-net
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: soc-dss-postgres
@@ -34,9 +118,16 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-strict}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-soc-dss-ingestion-v1}
+      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-true}
+      ACTION_APPROVAL_SECRET: ${ACTION_APPROVAL_SECRET:-change-this-development-secret-32-characters}
+      ACTION_APPROVAL_TTL_MINUTES: ${ACTION_APPROVAL_TTL_MINUTES:-10}
     depends_on:
       postgres:
         condition: service_healthy
+      redpanda-init:
+        condition: service_completed_successfully
     volumes:
       - ${BACKEND_LOG_DIR:-./runtime/backend/logs}:/app/logs
       - ${REPORT_OUTPUT_DIR:-./runtime/reports}:/app/reports
@@ -61,4 +152,5 @@ services:
 
 networks:
   socdss-net:
+    name: socdss-net
     driver: bridge

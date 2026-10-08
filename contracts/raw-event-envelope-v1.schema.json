@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soc-dss.local/contracts/raw-event-envelope-v1.schema.json",
+  "title": "Raw Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ingestion_id", "tenant_id", "source_product", "ingestion_mode", "received_at", "content_type", "payload"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "ingestion_id": {"type": "string", "format": "uuid"},
+    "tenant_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "source_product": {"type": "string", "minLength": 1, "maxLength": 64},
+    "ingestion_mode": {"enum": ["realtime", "replay"]},
+    "received_at": {"type": "string", "format": "date-time"},
+    "content_type": {"type": "string", "minLength": 1},
+    "source_file": {"type": ["string", "null"]},
+    "source_offset": {"type": ["integer", "null"], "minimum": 0},
+    "connector_id": {"type": ["string", "null"]},
+    "source_cursor": {"type": ["string", "null"]},
+    "payload": {}
+  }
+}

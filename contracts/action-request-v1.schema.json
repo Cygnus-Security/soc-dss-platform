@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soc-dss.local/contracts/action-request-v1.schema.json",
+  "title": "Approved Action Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action_id", "incident_id", "action_type", "target", "approved_by", "approved_at", "expires_at", "approval_token", "rationale"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "action_id": {"type": "string", "format": "uuid"},
+    "incident_id": {"type": "integer", "minimum": 1},
+    "action_type": {"enum": ["temporary_ip_block", "rate_limit_ip", "session_invalidation", "increase_monitoring", "create_ticket"]},
+    "target": {"type": "string", "minLength": 1, "maxLength": 255},
+    "approved_by": {"type": "string", "minLength": 1, "maxLength": 255},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "approval_token": {"type": "string", "minLength": 32},
+    "rationale": {"type": "string", "minLength": 1, "maxLength": 2000}
+  }
+}

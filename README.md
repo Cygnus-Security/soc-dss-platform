@@ -23,9 +23,9 @@ The Wazuh validation environment is kept under `experiments/` and is used only t
 ## Architecture
 
 ```text
-Wazuh / SIEM Alerts
+Wazuh / SOAR Collectors
         ↓
-Wazuh Integration Layer
+SecurityEvent v1 / Redpanda
         ↓
 Spring Boot Backend API
         ↓
@@ -38,6 +38,8 @@ DSS Core Engine
 PostgreSQL
         ↓
 React SOC Dashboard
+        ↓ analyst approval
+SOAR allowlisted response executor
 ```
 
 ## Repository Structure
@@ -77,6 +79,14 @@ Open backend API directly:
 ```text
 http://localhost:8080/api/v1/health
 ```
+
+Start SOC-DSS together with the SOAR submodule and both ingestion paths:
+
+```bash
+make integration-up
+```
+
+The command synchronizes and initializes all Git submodules before building, then enables the Wazuh polling profile. The ingestion gateway is available at `http://localhost:8090`; Syslog TCP/UDP listens on port `5514`. Use `make integration-down` to stop both projects.
 
 ## Run Product Locally for Development
 
@@ -141,6 +151,11 @@ GET    /api/v1/alerts
 GET    /api/v1/incidents
 GET    /api/v1/incidents/{id}
 POST   /api/v1/incidents/correlate
+POST   /api/v1/events/batch
+GET    /api/v1/incidents/{id}/actions
+POST   /api/v1/incidents/{id}/actions
+POST   /api/v1/incidents/{id}/actions/{actionId}/approve
+POST   /api/v1/incidents/{id}/actions/{actionId}/reject
 GET    /api/v1/dashboard/summary
 GET    /api/v1/reports/incidents.csv
 GET    /api/v1/health

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soc-dss.local/contracts/security-event-v1.schema.json",
+  "title": "SecurityEventV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "tenant_id",
+    "source_type",
+    "source_product",
+    "external_id",
+    "observed_at",
+    "ingested_at",
+    "event_type",
+    "severity",
+    "confidence",
+    "evidence",
+    "mitre_techniques",
+    "cve_ids",
+    "raw_reference",
+    "normalizer_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "wazuh",
+        "endpoint",
+        "ids",
+        "firewall",
+        "web",
+        "application",
+        "auth",
+        "audit",
+        "container",
+        "asset",
+        "vulnerability"
+      ]
+    },
+    "source_product": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "external_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ingested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_severity": {
+      "type": ["number", "null"]
+    },
+    "severity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "asset_id": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "source_ip": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "format": "ipv4" },
+        { "type": "string", "format": "ipv6" }
+      ]
+    },
+    "destination_ip": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "format": "ipv4" },
+        { "type": "string", "format": "ipv6" }
+      ]
+    },
+    "user_id": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "mitre_techniques": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+      }
+    },
+    "cve_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255
+      }
+    },
+    "raw_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "normalizer_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

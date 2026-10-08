@@ -1,0 +1,29 @@
+version: 1
+defaults:
+  partitions: 6
+  replication_factor: 1
+topics:
+  - name: soc.raw.v1
+    retention_ms: 604800000
+    key: source:external_id
+  - name: soc.normalized.v1
+    retention_ms: 2592000000
+    key: tenant:asset-or-source-ip
+  - name: soc.behavior.v1
+    retention_ms: 2592000000
+    key: tenant:session_id
+  - name: soc.incident-candidate.v1
+    retention_ms: 2592000000
+    key: correlation_key
+  - name: soc.decision-feedback.v1
+    retention_ms: 7776000000
+    key: incident_id
+  - name: soc.action-approved.v1
+    retention_ms: 2592000000
+    key: incident_id
+  - name: soc.action-result.v1
+    retention_ms: 7776000000
+    key: action_execution_id
+  - name: soc.dlq.v1
+    retention_ms: 2592000000
+    key: event_id

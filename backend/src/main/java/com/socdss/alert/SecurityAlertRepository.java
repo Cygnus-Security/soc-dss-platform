@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface SecurityAlertRepository extends JpaRepository<SecurityAlert, Long> {
+    boolean existsByTenantIdAndEventId(String tenantId, String eventId);
+
     List<SecurityAlert> findByIncidentType(String incidentType);
 
     @Query("select distinct a.incidentType from SecurityAlert a where a.incidentType is not null")

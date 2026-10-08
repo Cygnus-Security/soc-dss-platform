@@ -112,6 +112,24 @@ export interface IncidentFeedback {
   decisionStatus: string;
 }
 
+export type ResponseActionStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'DISPATCHED' | 'REJECTED' | 'EXECUTED' | 'FAILED' | 'DRY_RUN';
+
+export interface ResponseAction {
+  id: string;
+  incidentId: number;
+  actionType: string;
+  target: string;
+  rationale: string;
+  status: ResponseActionStatus;
+  requestedBy?: string;
+  decidedBy?: string;
+  requestedAt: string;
+  decidedAt?: string;
+  approvalExpiresAt?: string;
+  resultMessage?: string;
+  completedAt?: string;
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   username?: string;

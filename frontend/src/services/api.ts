@@ -1,4 +1,4 @@
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, ResponseAction, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -149,6 +149,22 @@ export const api = {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(feedback)
+  }),
+  responseActions: (incidentId: number) => request<ResponseAction[]>(`/incidents/${incidentId}/actions`),
+  createResponseAction: (incidentId: number, actionType: string, target: string, rationale: string, requestedBy: string) => request<ResponseAction>(`/incidents/${incidentId}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actionType, target, rationale, requestedBy })
+  }),
+  approveResponseAction: (incidentId: number, actionId: string, actor: string) => request<ResponseAction>(`/incidents/${incidentId}/actions/${actionId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor })
+  }),
+  rejectResponseAction: (incidentId: number, actionId: string, actor: string, reason: string) => request<ResponseAction>(`/incidents/${incidentId}/actions/${actionId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor, reason })
   }),
   correlate: () => request<CorrelationJobStatus>('/incidents/correlate', { method: 'POST' }),
   correlationStatus: () => request<CorrelationJobStatus>('/incidents/correlation/status'),
