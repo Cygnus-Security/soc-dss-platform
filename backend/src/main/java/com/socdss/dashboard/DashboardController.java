@@ -1,14 +1,12 @@
 package com.socdss.dashboard;
 
 import com.socdss.alert.SecurityAlertRepository;
-import com.socdss.incident.Incident;
 import com.socdss.incident.IncidentRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
@@ -24,17 +22,19 @@ public class DashboardController {
     @GetMapping("/summary")
     public DashboardSummary summary() {
         long alerts = alertRepository.count();
-        long incidents = incidentRepository.count();
+        Map<String, Long> byLevel = incidentRepository.countGroupedByRiskLevel().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        entry -> entry.getRiskLevel() == null ? "Unknown" : entry.getRiskLevel(),
+                        entry -> entry.getTotal()
+                ));
+        long incidents = byLevel.values().stream().mapToLong(Long::longValue).sum();
         double reduction = alerts > 0 ? ((alerts - incidents) * 100.0 / alerts) : 0.0;
-
-        Map<String, Long> byLevel = incidentRepository.findAll().stream()
-                .collect(Collectors.groupingBy(Incident::getRiskLevel, Collectors.counting()));
 
         return new DashboardSummary(
                 alerts,
                 incidents,
-                incidentRepository.countByRiskLevel("Critical"),
-                incidentRepository.countByRiskLevel("High"),
+                byLevel.getOrDefault("Critical", 0L),
+                byLevel.getOrDefault("High", 0L),
                 Math.round(reduction * 100.0) / 100.0,
                 byLevel
         );

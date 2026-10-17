@@ -1,4 +1,4 @@
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, ResponseAction, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, IncidentPage, ResponseAction, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -144,6 +144,7 @@ export const api = {
   summary: () => request<DashboardSummary>('/dashboard/summary'),
   alerts: () => request<SecurityAlert[]>('/alerts'),
   incidents: () => request<Incident[]>('/incidents'),
+  incidentPage: (page = 0, size = 50) => request<IncidentPage>(`/incidents/page?page=${page}&size=${size}`),
   incident: (id: number) => request<Incident>(`/incidents/${id}`),
   feedback: (id: number, feedback: IncidentFeedback) => request<Incident>(`/incidents/${id}/feedback`, {
     method: 'PATCH',

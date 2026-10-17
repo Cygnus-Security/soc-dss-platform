@@ -7,6 +7,7 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  LabelList,
   Line,
   LineChart,
   Pie,
@@ -23,7 +24,7 @@ import './styles.css';
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
 
 const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const INCIDENT_PAGE_SIZE = 50;
 
 function riskClass(level?: string) {
   return `badge badge-${(level || 'low').toLowerCase()}`;
@@ -71,6 +72,11 @@ function App() {
   const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [incidents, setIncidents] = React.useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = React.useState<Incident | null>(null);
+  const [incidentPage, setIncidentPage] = React.useState(0);
+  const [incidentTotalPages, setIncidentTotalPages] = React.useState(0);
+  const [incidentTotalElements, setIncidentTotalElements] = React.useState(0);
+  const [incidentsLoading, setIncidentsLoading] = React.useState(false);
+  const [summaryLoading, setSummaryLoading] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [correlationStatus, setCorrelationStatus] = React.useState<CorrelationJobStatus | null>(null);
@@ -78,17 +84,36 @@ function App() {
   const [reportFrom, setReportFrom] = React.useState('');
   const [reportTo, setReportTo] = React.useState('');
 
+  async function loadIncidentPage(pageNumber: number) {
+    setIncidentsLoading(true);
+    try {
+      const result = await api.incidentPage(pageNumber, INCIDENT_PAGE_SIZE);
+      setIncidents(result.content);
+      setIncidentPage(result.page);
+      setIncidentTotalPages(result.totalPages);
+      setIncidentTotalElements(result.totalElements);
+    } catch {
+      setMessage('Unable to load the incident page. Check backend logs.');
+    } finally {
+      setIncidentsLoading(false);
+    }
+  }
+
   async function refresh() {
     setLoading(true);
+    setSummaryLoading(true);
+
+    const summaryRequest = api.summary()
+      .then(setSummary)
+      .catch(() => setMessage('Unable to load dashboard summary. Check backend logs.'))
+      .finally(() => setSummaryLoading(false));
+    const statusRequest = api.correlationStatus()
+      .then(setCorrelationStatus)
+      .catch(() => setMessage('Unable to read correlation status. Check backend logs.'));
+
+    void loadIncidentPage(0);
     try {
-      const [s, i, c] = await Promise.all([api.summary(), api.incidents(), api.correlationStatus()]);
-      setSummary(s);
-      setIncidents(i);
-      setCorrelationStatus(c);
-      if (i.length > 0 && !selectedIncident) {
-        const detail = await api.incident(i[0].id);
-        setSelectedIncident(detail);
-      }
+      await Promise.allSettled([summaryRequest, statusRequest]);
     } finally {
       setLoading(false);
     }
@@ -111,6 +136,9 @@ function App() {
     setSummary(null);
     setIncidents([]);
     setSelectedIncident(null);
+    setIncidentPage(0);
+    setIncidentTotalPages(0);
+    setIncidentTotalElements(0);
   }
 
   async function handleCorrelate() {
@@ -154,7 +182,12 @@ function App() {
   const riskData = riskChartData(summary);
   const scoreData = scoreChartData(incidents);
   const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
+  const chartLoading = chartView.startsWith('risk')
+    ? summaryLoading && summary === null
+    : incidentsLoading && incidents.length === 0;
   const reportRange = reportFrom && reportTo ? { from: reportFrom, to: reportTo } : undefined;
+  const firstIncidentNumber = incidentTotalElements === 0 ? 0 : incidentPage * INCIDENT_PAGE_SIZE + 1;
+  const lastIncidentNumber = Math.min((incidentPage + 1) * INCIDENT_PAGE_SIZE, incidentTotalElements);
 
   if (!auth) {
     return <div className="auth-shell"><div className="panel auth-panel"><h1>SOC DSS</h1><p>Checking session...</p></div></div>;
@@ -206,10 +239,10 @@ function App() {
         {page === 'dashboard' && (
           <section>
             <div className="cards">
-              <Metric title="Total Alerts" value={summary?.totalAlerts ?? 0} />
-              <Metric title="Total Incidents" value={summary?.totalIncidents ?? 0} />
-              <Metric title="Critical" value={summary?.criticalIncidents ?? 0} />
-              <Metric title="Alert Reduction" value={`${summary?.alertReductionRate ?? 0}%`} />
+              <Metric title="Total Alerts" value={summary ? summary.totalAlerts.toLocaleString() : '…'} />
+              <Metric title="Total Incidents" value={summary ? summary.totalIncidents.toLocaleString() : '…'} />
+              <Metric title="Critical" value={summary ? summary.criticalIncidents.toLocaleString() : '…'} />
+              <Metric title="Alert Reduction" value={summary ? `${summary.alertReductionRate}%` : '…'} />
             </div>
             <div className="panel report-panel">
               <h2>Decision Reports</h2>
@@ -238,18 +271,34 @@ function App() {
                   <button className={chartView === 'score-line' ? 'active' : ''} onClick={() => setChartView('score-line')}>Score Line</button>
                 </div>
               </div>
-              {chartHasData ? (
+              {chartLoading ? (
+                <div className="empty-state loading-state">
+                  <strong>Loading chart data…</strong>
+                  <span>The dashboard summary and incident page load independently.</span>
+                </div>
+              ) : chartHasData ? (
                 <div className="chart">
                   <ResponsiveContainer width="100%" height={260}>
                     {chartView === 'risk-donut' ? (
                       <PieChart>
-                        <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={98} paddingAngle={4}>
+                        <Pie
+                          data={riskData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={58}
+                          outerRadius={98}
+                          paddingAngle={4}
+                          minAngle={2}
+                        >
                           {riskData.map(item => (
                             <Cell key={item.name} fill={item.fill} />
                           ))}
                         </Pie>
                         <Tooltip />
-                        <Legend />
+                        <Legend formatter={value => {
+                          const item = riskData.find(entry => entry.name === value);
+                          return `${value} (${(item?.value ?? 0).toLocaleString()})`;
+                        }} />
                       </PieChart>
                     ) : chartView === 'score-bar' ? (
                       <BarChart data={scoreData}>
@@ -277,14 +326,24 @@ function App() {
                         <XAxis dataKey="name" />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]} minPointSize={6}>
                           {riskData.map(item => (
                             <Cell key={item.name} fill={item.fill} />
                           ))}
+                          <LabelList
+                            dataKey="value"
+                            position="top"
+                            formatter={value => typeof value === 'number' ? value.toLocaleString() : String(value ?? '')}
+                          />
                         </Bar>
                       </BarChart>
                     )}
                   </ResponsiveContainer>
+                  {!chartView.startsWith('risk') && incidentTotalElements > incidents.length && (
+                    <div className="chart-note">
+                      Showing the top {incidents.length.toLocaleString()} highest-risk incidents from {incidentTotalElements.toLocaleString()} total.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="empty-state">
@@ -302,7 +361,13 @@ function App() {
         {page === 'incidents' && (
           <section className="split">
             <div className="panel">
-              <h2>Incident Ranking</h2>
+              <div className="panel-heading">
+                <h2>Incident Ranking</h2>
+                <span className="page-summary">
+                  {firstIncidentNumber.toLocaleString()}–{lastIncidentNumber.toLocaleString()} of {incidentTotalElements.toLocaleString()}
+                </span>
+              </div>
+              {incidentsLoading && <div className="loading-inline">Loading page {incidentPage + 1}…</div>}
               <table>
                 <thead>
                   <tr><th>ID</th><th>Type</th><th>Asset</th><th>Alerts</th><th>Score</th><th>Level</th></tr>
@@ -318,8 +383,26 @@ function App() {
                       <td><span className={riskClass(i.riskLevel)}>{i.riskLevel}</span></td>
                     </tr>
                   ))}
+                  {!incidentsLoading && incidents.length === 0 && (
+                    <tr><td colSpan={6} className="table-empty">No incidents found.</td></tr>
+                  )}
                 </tbody>
               </table>
+              <div className="pagination">
+                <button
+                  disabled={incidentsLoading || incidentPage === 0}
+                  onClick={() => loadIncidentPage(incidentPage - 1)}
+                >
+                  Previous
+                </button>
+                <span>Page {incidentPage + 1} of {Math.max(incidentTotalPages, 1)}</span>
+                <button
+                  disabled={incidentsLoading || incidentPage + 1 >= incidentTotalPages}
+                  onClick={() => loadIncidentPage(incidentPage + 1)}
+                >
+                  Next
+                </button>
+              </div>
             </div>
             <IncidentDetail incident={selectedIncident} actor={auth.username || 'admin'} />
           </section>

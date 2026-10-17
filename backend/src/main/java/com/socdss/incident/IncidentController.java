@@ -5,6 +5,8 @@ import com.socdss.correlation.CorrelationJobStatus;
 import com.socdss.decision.DecisionSupportService;
 import com.socdss.risk.RiskAssessmentService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,28 @@ public class IncidentController {
         return incidentRepository.findAllByOrderByRiskScoreDesc().stream()
                 .map(i -> IncidentDto.from(i, false, List.of(), decisionSupportService.advise(i)))
                 .toList();
+    }
+
+    @GetMapping("/page")
+    public IncidentPageDto page(@RequestParam(defaultValue = "0") int page,
+                                @RequestParam(defaultValue = "50") int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 10), 100);
+        Page<Incident> result = incidentRepository.findAllByOrderByRiskScoreDescIdDesc(
+                PageRequest.of(safePage, safeSize)
+        );
+        List<IncidentDto> content = result.getContent().stream()
+                .map(i -> IncidentDto.from(i, false, List.of(), decisionSupportService.advise(i)))
+                .toList();
+        return new IncidentPageDto(
+                content,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.isFirst(),
+                result.isLast()
+        );
     }
 
     @GetMapping("/{id}")
