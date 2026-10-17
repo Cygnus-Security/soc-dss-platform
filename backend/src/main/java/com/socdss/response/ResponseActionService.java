@@ -210,7 +210,7 @@ public class ResponseActionService {
 
     private String normalize(String value, boolean uppercase) {
         if (value == null || value.isBlank()) {
-            return null;
+            return "";
         }
         String normalized = value.trim();
         return uppercase ? normalized.toUpperCase(java.util.Locale.ROOT) : normalized;

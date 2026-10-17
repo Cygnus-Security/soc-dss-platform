@@ -17,9 +17,9 @@ public interface ResponseActionRepository extends JpaRepository<ResponseAction, 
                     SELECT action
                     FROM ResponseAction action
                     JOIN FETCH action.incident incident
-                    WHERE (:status IS NULL OR action.status = :status)
-                      AND (:actionType IS NULL OR action.actionType = :actionType)
-                      AND (:search IS NULL
+                    WHERE (:status = '' OR action.status = :status)
+                      AND (:actionType = '' OR action.actionType = :actionType)
+                      AND (:search = ''
                            OR LOWER(action.id) LIKE LOWER(CONCAT('%', :search, '%'))
                            OR LOWER(action.target) LIKE LOWER(CONCAT('%', :search, '%'))
                            OR LOWER(action.resultMessage) LIKE LOWER(CONCAT('%', :search, '%')))
@@ -28,9 +28,9 @@ public interface ResponseActionRepository extends JpaRepository<ResponseAction, 
             countQuery = """
                     SELECT COUNT(action)
                     FROM ResponseAction action
-                    WHERE (:status IS NULL OR action.status = :status)
-                      AND (:actionType IS NULL OR action.actionType = :actionType)
-                      AND (:search IS NULL
+                    WHERE (:status = '' OR action.status = :status)
+                      AND (:actionType = '' OR action.actionType = :actionType)
+                      AND (:search = ''
                            OR LOWER(action.id) LIKE LOWER(CONCAT('%', :search, '%'))
                            OR LOWER(action.target) LIKE LOWER(CONCAT('%', :search, '%'))
                            OR LOWER(action.resultMessage) LIKE LOWER(CONCAT('%', :search, '%')))

@@ -36,13 +36,17 @@ class ResponseActionRepositoryTest {
         ));
 
         Page<ResponseAction> failed = actionRepository.search(
-                "FAILED", null, "192.0.2", PageRequest.of(0, 10)
+                "FAILED", "", "192.0.2", PageRequest.of(0, 10)
+        );
+        Page<ResponseAction> unfiltered = actionRepository.search(
+                "", "", "", PageRequest.of(0, 10)
         );
         Map<String, Long> counts = actionRepository.countGroupedByStatus().stream()
                 .collect(Collectors.toMap(ResponseActionStatusCount::getStatus, ResponseActionStatusCount::getTotal));
 
         assertThat(failed.getTotalElements()).isEqualTo(1);
         assertThat(failed.getContent()).extracting(ResponseAction::getStatus).containsExactly("FAILED");
+        assertThat(unfiltered.getTotalElements()).isEqualTo(2);
         assertThat(counts).containsEntry("FAILED", 1L).containsEntry("DRY_RUN", 1L);
         assertThat(actionRepository.findLatestCompletedAt()).isEqualTo(newer);
     }

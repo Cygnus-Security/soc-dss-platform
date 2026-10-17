@@ -720,14 +720,26 @@ function SoarActionsPage({ onOpenIncident }: { onOpenIncident: (id: number) => v
     if (showLoading) setLoading(true);
     setError('');
     try {
-      const [nextSummary, nextPage] = await Promise.all([
+      const [summaryResult, pageResult] = await Promise.allSettled([
         api.soarActionSummary(),
         api.soarActions(page, SOAR_ACTION_PAGE_SIZE, status, actionType, search)
       ]);
-      setSummary(nextSummary);
-      setResult(nextPage);
+      const failedRequests: string[] = [];
+      if (summaryResult.status === 'fulfilled') {
+        setSummary(summaryResult.value);
+      } else {
+        failedRequests.push(`summary (${summaryResult.reason instanceof Error ? summaryResult.reason.message : 'request failed'})`);
+      }
+      if (pageResult.status === 'fulfilled') {
+        setResult(pageResult.value);
+      } else {
+        failedRequests.push(`action history (${pageResult.reason instanceof Error ? pageResult.reason.message : 'request failed'})`);
+      }
+      if (failedRequests.length > 0) {
+        setError(`Unable to load ${failedRequests.join(' and ')}. Check backend logs.`);
+      }
     } catch {
-      setError('Unable to load SOAR actions. Check the backend connection and logs.');
+      setError('Unable to load SOAR actions because the backend is unreachable.');
     } finally {
       if (showLoading) setLoading(false);
     }
