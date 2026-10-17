@@ -39,6 +39,64 @@ Username: admin
 Password: SecretPassword
 ```
 
+## Connect the Metasploitable2 victim
+
+Metasploitable2 is based on an obsolete Ubuntu release, so the current Wazuh
+agent package is not installed inside that container. The lab instead runs the
+official Wazuh agent image as a sidecar named
+`soc-dss-metasploitable2-wazuh-agent`. It mounts the victim's `/var/log`
+read-only and forwards its SSH, system, Apache, FTP, and Samba logs to Wazuh.
+
+The Wazuh-only workflow can run with the checked-in safe defaults. To override
+the manager host, agent name, or ports, create the integration environment:
+
+```bash
+cp deploy/production/.env.example deploy/production/.env
+```
+
+Then start Wazuh, the Metasploitable2 victim, and its agent together:
+
+```bash
+make wazuh-metasploitable2-lab-up
+```
+
+This target does not start the SOAR firewall executor and therefore does not
+require a webhook token. Run `make metasploitable2-lab-up` separately when the
+SOAR response path is also needed.
+
+The default connection uses the manager ports published on the Docker host:
+
+```dotenv
+WAZUH_MANAGER_HOST=host.docker.internal
+WAZUH_MANAGER_PORT=1514
+WAZUH_REGISTRATION_PORT=1515
+WAZUH_AGENT_NAME=soc-dss-metasploitable2-victim
+```
+
+On a remote Ubuntu Wazuh host, replace `WAZUH_MANAGER_HOST` with that host's IP
+or resolvable DNS name and allow inbound TCP 1514 and 1515.
+
+Check both the sidecar processes and the manager-side connection list:
+
+```bash
+make wazuh-metasploitable2-agent-status
+```
+
+Follow agent enrollment and forwarding logs:
+
+```bash
+make wazuh-metasploitable2-agent-logs
+```
+
+In the Wazuh dashboard, open **Agents management > Summary** and look for
+`soc-dss-metasploitable2-victim`.
+
+The sidecar provides real application and authentication log collection. Its
+OS inventory, process inventory, rootcheck, and file-integrity state describe
+the sidecar rather than the legacy victim and are intentionally disabled in
+the lab configuration. Use a supported Ubuntu victim if those endpoint-level
+capabilities are required.
+
 ## Generate Alerts
 
 Use the Wazuh dashboard or an enrolled Wazuh agent to generate test alerts. The manager alert file used by SOC DSS is:

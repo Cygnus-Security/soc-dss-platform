@@ -12,11 +12,46 @@ services:
         ipv4_address: ${METASPLOITABLE_VICTIM_IP:-172.31.252.20}
       control_net:
         ipv4_address: ${METASPLOITABLE_EXECUTOR_IP:-172.31.253.3}
+    volumes:
+      - metasploitable_logs:/var/log
     healthcheck:
       test: ["CMD-SHELL", "netstat -lnt 2>/dev/null | grep -q ':80 '"]
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+
+  wazuh_agent:
+    profiles:
+      - wazuh
+    image: wazuh/wazuh-agent:${WAZUH_AGENT_VERSION:-4.14.5}
+    container_name: soc-dss-metasploitable2-wazuh-agent
+    hostname: soc-dss-metasploitable2-victim
+    depends_on:
+      victim:
+        condition: service_healthy
+    environment:
+      WAZUH_MANAGER_SERVER: ${WAZUH_MANAGER_HOST:-host.docker.internal}
+      WAZUH_MANAGER_PORT: ${WAZUH_MANAGER_PORT:-1514}
+      WAZUH_REGISTRATION_SERVER: ${WAZUH_MANAGER_HOST:-host.docker.internal}
+      WAZUH_REGISTRATION_PORT: ${WAZUH_REGISTRATION_PORT:-1515}
+      WAZUH_REGISTRATION_PASSWORD: ${WAZUH_REGISTRATION_PASSWORD:-}
+      WAZUH_AGENT_NAME: ${WAZUH_AGENT_NAME:-soc-dss-metasploitable2-victim}
+      WAZUH_AGENT_GROUP: ${WAZUH_AGENT_GROUP:-default}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      - wazuh_egress
+    volumes:
+      - metasploitable_logs:/metasploitable-logs:ro
+      - wazuh_agent_etc:/var/ossec/etc
+      - ./wazuh-agent/wazuh-agent-conf:/wazuh-config-mount/etc/ossec.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/var/ossec/bin/wazuh-control status 2>/dev/null | grep -q 'wazuh-agentd is running'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
   firewall_executor:
@@ -78,3 +113,11 @@ networks:
     ipam:
       config:
         - subnet: ${METASPLOITABLE_CONTROL_SUBNET:-172.31.253.0/29}
+  wazuh_egress:
+    name: soc-dss-metasploitable2-wazuh-egress
+
+volumes:
+  metasploitable_logs:
+    name: soc-dss-metasploitable2-logs
+  wazuh_agent_etc:
+    name: soc-dss-metasploitable2-wazuh-agent-etc

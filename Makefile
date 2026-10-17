@@ -1,4 +1,4 @@
-.PHONY: require-integration-env up down logs integration-up integration-down integration-logs soar-action-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
+.PHONY: require-integration-env up down logs integration-up integration-down integration-logs soar-action-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import wazuh-metasploitable2-lab-up wazuh-metasploitable2-agent-status wazuh-metasploitable2-agent-logs metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
 
 INTEGRATION_ENV ?= deploy/production/.env
 SOAR_COMPOSE := integrations/soar-mcp-platform/docker-compose.yml
@@ -55,6 +55,18 @@ wazuh-lab-export:
 
 wazuh-lab-import:
 	./scripts/wazuh-import-alerts.sh
+
+wazuh-metasploitable2-lab-up:
+	INTEGRATION_ENV="$(INTEGRATION_ENV)" ./scripts/wazuh-metasploitable2-up.sh
+
+wazuh-metasploitable2-agent-status:
+	INTEGRATION_ENV="$(INTEGRATION_ENV)" ./scripts/wazuh-metasploitable2-status.sh
+
+wazuh-metasploitable2-agent-logs:
+	@ENV_FILE="$(INTEGRATION_ENV)"; \
+	if [ ! -f "$$ENV_FILE" ]; then ENV_FILE=deploy/production/.env.example; fi; \
+	SOAR_ACTION_WEBHOOK_TOKEN=wazuh-profile-unused \
+	docker compose --env-file "$$ENV_FILE" -f "$(METASPLOITABLE2_LAB_COMPOSE)" --profile wazuh logs -f wazuh_agent
 
 metasploitable2-lab-up:
 	@test -f "$(INTEGRATION_ENV)" || (echo "Missing $(INTEGRATION_ENV). Copy deploy/production/.env.example first." >&2; exit 1)
