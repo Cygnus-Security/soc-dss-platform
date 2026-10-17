@@ -81,9 +81,10 @@ function App() {
   async function refresh() {
     setLoading(true);
     try {
-      const [s, i] = await Promise.all([api.summary(), api.incidents()]);
+      const [s, i, c] = await Promise.all([api.summary(), api.incidents(), api.correlationStatus()]);
       setSummary(s);
       setIncidents(i);
+      setCorrelationStatus(c);
       if (i.length > 0 && !selectedIncident) {
         const detail = await api.incident(i[0].id);
         setSelectedIncident(detail);
@@ -119,28 +120,32 @@ function App() {
       const started = await api.correlate();
       setCorrelationStatus(started);
       setMessage('Alert correlation started. This can take a few minutes for large imports.');
-      for (let attempt = 0; attempt < 120; attempt++) {
-        await sleep(3000);
-        const status = await api.correlationStatus();
-        setCorrelationStatus(status);
-        if (status.status === 'COMPLETED') {
-          await refresh();
-          setMessage(`Alert correlation completed successfully${status.incidentCount != null ? ` with ${status.incidentCount} incidents` : ''}.`);
-          return;
-        }
-        if (status.status === 'FAILED') {
-          setMessage(`Correlation failed: ${status.message}`);
-          return;
-        }
-      }
-      await refresh();
-      setMessage('Correlation is still running. Refresh later to see updated incidents.');
     } catch (e) {
       setMessage('Correlation failed. Check backend logs.');
     } finally {
       setLoading(false);
     }
   }
+
+  React.useEffect(() => {
+    if (correlationStatus?.status !== 'RUNNING') return;
+
+    const timer = window.setInterval(() => {
+      api.correlationStatus()
+        .then(async status => {
+          setCorrelationStatus(status);
+          if (status.status === 'COMPLETED') {
+            await refresh();
+            setMessage(`Alert correlation completed successfully${status.incidentCount != null ? ` with ${status.incidentCount} incidents` : ''}.`);
+          } else if (status.status === 'FAILED') {
+            setMessage(`Correlation failed: ${status.message}`);
+          }
+        })
+        .catch(() => setMessage('Unable to read correlation progress. Check backend logs.'));
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [correlationStatus?.status]);
 
   async function openIncident(id: number) {
     setSelectedIncident(await api.incident(id));
@@ -195,7 +200,7 @@ function App() {
 
         {message && <div className="notice">{message}</div>}
         {correlationStatus?.status === 'RUNNING' && (
-          <div className="notice notice-warn">Correlation is running in the background. You can keep importing or refresh later.</div>
+          <div className="notice notice-warn">{correlationStatus.message}</div>
         )}
 
         {page === 'dashboard' && (

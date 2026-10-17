@@ -21,6 +21,8 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +51,8 @@ class CorrelationServiceIntegrationTest {
         incidentRepository.deleteAll();
         alertRepository.deleteAll();
         when(riskAssessmentService.assess(anyList()))
+                .thenReturn(new RiskAssessmentResult(75.0, "High", "Test risk assessment"));
+        when(riskAssessmentService.assess(any(SecurityAlert.class), anyInt(), anyInt(), anyBoolean()))
                 .thenReturn(new RiskAssessmentResult(75.0, "High", "Test risk assessment"));
         when(recommendationService.recommend(any(), any(), any(), any()))
                 .thenReturn("Test recommendation");

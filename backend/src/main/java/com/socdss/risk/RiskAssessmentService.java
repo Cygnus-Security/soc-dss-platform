@@ -55,15 +55,25 @@ public class RiskAssessmentService {
         }
 
         SecurityAlert representative = alerts.get(0);
-        AssetContext asset = resolveAsset(representative);
-
         int maxRuleLevel = alerts.stream().map(SecurityAlert::getWazuhRuleLevel).max(Comparator.naturalOrder()).orElse(0);
+        return assess(representative, alerts.size(), maxRuleLevel, containsVulnerabilityContext(alerts));
+    }
+
+    public RiskAssessmentResult assess(SecurityAlert representative,
+                                       int alertCount,
+                                       int maxRuleLevel,
+                                       boolean vulnerabilityContext) {
+        if (representative == null || alertCount <= 0) {
+            return new RiskAssessmentResult(0, "Low", "No alerts available for risk assessment.");
+        }
+
+        AssetContext asset = resolveAsset(representative);
         double severityScore = Math.min((maxRuleLevel / 16.0) * 100.0, 100.0);
         double assetScore = CRITICALITY_SCORE.getOrDefault(asset.criticality(), 50);
-        double frequencyScore = Math.min(alerts.size() * 10.0, 100.0);
+        double frequencyScore = Math.min(alertCount * 10.0, 100.0);
         double mitreScore = TACTIC_WEIGHT.getOrDefault(blankToDefault(representative.getMitreTactic(), ""), 35);
         double exposureScore = EXPOSURE_SCORE.getOrDefault(asset.exposure(), 50);
-        double vulnerabilityScore = containsVulnerabilityContext(alerts) ? 80.0 : 0.0;
+        double vulnerabilityScore = vulnerabilityContext ? 80.0 : 0.0;
 
         RiskModelDto model = currentModel();
         List<RiskFactor> factors = factors(
@@ -78,7 +88,7 @@ public class RiskAssessmentService {
                 frequencyScore,
                 model.frequencyWeight(),
                 "Alert frequency",
-                alerts.size() + " related alerts are grouped into this incident",
+                alertCount + " related alerts are grouped into this incident",
                 mitreScore,
                 model.mitreWeight(),
                 "MITRE tactic",
