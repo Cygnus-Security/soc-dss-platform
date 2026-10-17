@@ -29,8 +29,17 @@ The script clones the official Wazuh Docker repo, generates self-signed certific
 Wazuh dashboard:
 
 ```text
-https://localhost
+http://localhost
 ```
+
+From another machine, use `http://<UBUNTU_SERVER_IP>`. The dashboard listens
+on HTTP port 80 by default. To use another port, set for example
+`WAZUH_DASHBOARD_HTTP_PORT=5601` in `deploy/wazuh-lab/.env` and open
+`http://<UBUNTU_SERVER_IP>:5601`.
+
+Plain HTTP does not encrypt credentials or session cookies. Keep this setting
+inside an isolated lab network; use the upstream HTTPS configuration or a TLS
+reverse proxy for any exposed environment.
 
 Default lab credentials:
 
