@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ShieldCheck, Upload, ListChecks, BarChart3, Download, SlidersHorizontal } from 'lucide-react';
+import { ShieldCheck, Upload, ListChecks, BarChart3, Download, SlidersHorizontal, Workflow } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -18,13 +18,15 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, ResponseAction, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, ResponseAction, ResponseActionPage, ResponseActionStatus, ResponseActionSummary, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
 
 const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
 const INCIDENT_PAGE_SIZE = 50;
+const SOAR_ACTION_PAGE_SIZE = 25;
+const actionStatuses: ResponseActionStatus[] = ['PENDING_APPROVAL', 'APPROVED', 'DISPATCHED', 'EXECUTED', 'DRY_RUN', 'FAILED', 'REJECTED'];
 
 function riskClass(level?: string) {
   return `badge badge-${(level || 'low').toLowerCase()}`;
@@ -66,8 +68,35 @@ function scoreChartData(incidents: Incident[]) {
     }));
 }
 
+function actionStatusClass(status: ResponseActionStatus) {
+  return `action-badge action-badge-${status.toLowerCase().replace('_', '-')}`;
+}
+
+function actionStatusColor(status: string) {
+  switch (status) {
+    case 'EXECUTED': return '#16a34a';
+    case 'DRY_RUN': return '#0284c7';
+    case 'FAILED': return '#dc2626';
+    case 'REJECTED': return '#64748b';
+    case 'DISPATCHED': return '#7c3aed';
+    case 'APPROVED': return '#4f46e5';
+    default: return '#d97706';
+  }
+}
+
+function readableActionValue(value: string) {
+  return value.toLowerCase().split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function formatTimestamp(value?: string) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).format(new Date(value));
+}
+
 function App() {
-  const [page, setPage] = React.useState<'dashboard' | 'import' | 'incidents' | 'model'>('dashboard');
+  const [page, setPage] = React.useState<'dashboard' | 'import' | 'incidents' | 'soar' | 'model'>('dashboard');
   const [chartView, setChartView] = React.useState<ChartView>('risk-bar');
   const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [incidents, setIncidents] = React.useState<Incident[]>([]);
@@ -214,6 +243,7 @@ function App() {
         <button className={page === 'dashboard' ? 'active' : ''} onClick={() => setPage('dashboard')}><BarChart3 size={18} /> Dashboard</button>
         <button className={page === 'import' ? 'active' : ''} onClick={() => setPage('import')}><Upload size={18} /> Import Alerts</button>
         <button className={page === 'incidents' ? 'active' : ''} onClick={() => setPage('incidents')}><ListChecks size={18} /> Incidents</button>
+        <button className={page === 'soar' ? 'active' : ''} onClick={() => setPage('soar')}><Workflow size={18} /> SOAR Actions</button>
         <button className={page === 'model' ? 'active' : ''} onClick={() => setPage('model')}><SlidersHorizontal size={18} /> Decision Model</button>
         <a className="download" href={api.reportUrl()}><Download size={18} /> Export CSV</a>
         <a className="download" href={api.reportPdfUrl()}><Download size={18} /> Export PDF</a>
@@ -357,6 +387,10 @@ function App() {
 
         {page === 'import' && <ImportPage onImported={refresh} onCorrelate={handleCorrelate} />}
         {page === 'model' && <DecisionModelPage />}
+        {page === 'soar' && <SoarActionsPage onOpenIncident={async id => {
+          setPage('incidents');
+          await openIncident(id);
+        }} />}
 
         {page === 'incidents' && (
           <section className="split">
@@ -668,6 +702,161 @@ function IncidentDetail({ incident, actor }: { incident: Incident | null; actor:
         {incident.relatedAlerts?.map(a => <li key={a.id}>[{a.wazuhRuleLevel}] {a.description}</li>)}
       </ul>
     </div>
+  );
+}
+
+function SoarActionsPage({ onOpenIncident }: { onOpenIncident: (id: number) => void }) {
+  const [summary, setSummary] = React.useState<ResponseActionSummary | null>(null);
+  const [result, setResult] = React.useState<ResponseActionPage | null>(null);
+  const [page, setPage] = React.useState(0);
+  const [status, setStatus] = React.useState('');
+  const [actionType, setActionType] = React.useState('');
+  const [searchInput, setSearchInput] = React.useState('');
+  const [search, setSearch] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+
+  const load = React.useCallback(async (showLoading: boolean) => {
+    if (showLoading) setLoading(true);
+    setError('');
+    try {
+      const [nextSummary, nextPage] = await Promise.all([
+        api.soarActionSummary(),
+        api.soarActions(page, SOAR_ACTION_PAGE_SIZE, status, actionType, search)
+      ]);
+      setSummary(nextSummary);
+      setResult(nextPage);
+    } catch {
+      setError('Unable to load SOAR actions. Check the backend connection and logs.');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, [page, status, actionType, search]);
+
+  React.useEffect(() => {
+    void load(true);
+    const timer = window.setInterval(() => void load(false), 5000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const statusData = actionStatuses
+    .map(name => ({ name: readableActionValue(name), value: summary?.actionsByStatus[name] ?? 0, fill: actionStatusColor(name) }))
+    .filter(item => item.value > 0);
+  const actionTypes = Object.keys(summary?.actionsByType ?? {});
+  const firstActionNumber = !result || result.totalElements === 0 ? 0 : result.page * result.size + 1;
+  const lastActionNumber = !result ? 0 : Math.min((result.page + 1) * result.size, result.totalElements);
+
+  function applySearch(event: React.FormEvent) {
+    event.preventDefault();
+    const nextSearch = searchInput.trim();
+    setPage(0);
+    setSearch(nextSearch);
+    if (nextSearch === search && page === 0) void load(true);
+  }
+
+  return (
+    <section className="soar-page">
+      <div className="soar-heading">
+        <div>
+          <h2>SOAR Action Audit</h2>
+          <p>Live status and execution results reported by the SOAR response workflow.</p>
+        </div>
+        <div className="live-refresh">
+          <span><i /> Auto-refresh: 5s</span>
+          <button onClick={() => void load(true)} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh now'}</button>
+        </div>
+      </div>
+
+      {error && <div className="notice notice-error">{error}</div>}
+
+      <div className="cards soar-cards">
+        <Metric title="Processed by SOAR" value={summary ? summary.processedActions.toLocaleString() : '…'} />
+        <Metric title="Live Executed" value={summary ? summary.executedActions.toLocaleString() : '…'} />
+        <Metric title="Dry Run" value={summary ? summary.dryRunActions.toLocaleString() : '…'} />
+        <Metric title="Failed" value={summary ? summary.failedActions.toLocaleString() : '…'} />
+      </div>
+
+      <div className="soar-overview">
+        <div className="panel action-summary-panel">
+          <div className="panel-heading"><h2>Workflow Summary</h2></div>
+          <div className="summary-list">
+            <div><span>Total requested</span><strong>{summary?.totalActions.toLocaleString() ?? '…'}</strong></div>
+            <div><span>Awaiting approval</span><strong>{summary?.awaitingApprovalActions.toLocaleString() ?? '…'}</strong></div>
+            <div><span>In progress</span><strong>{summary?.inProgressActions.toLocaleString() ?? '…'}</strong></div>
+            <div><span>Rejected</span><strong>{summary?.rejectedActions.toLocaleString() ?? '…'}</strong></div>
+          </div>
+          <p className="last-processed">Last SOAR result: <strong>{formatTimestamp(summary?.lastProcessedAt)}</strong></p>
+        </div>
+        <div className="panel action-chart-panel">
+          <div className="panel-heading"><h2>Status Distribution</h2></div>
+          {statusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={statusData} layout="vertical" margin={{ left: 18, right: 28 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="name" width={112} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[0, 8, 8, 0]} minPointSize={5}>
+                  {statusData.map(item => <Cell key={item.name} fill={item.fill} />)}
+                  <LabelList dataKey="value" position="right" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="empty-state action-empty"><strong>No SOAR actions yet</strong><span>Create and approve an incident response action to populate this view.</span></div>
+          )}
+        </div>
+      </div>
+
+      <div className="panel action-table-panel">
+        <div className="panel-heading action-table-heading">
+          <div>
+            <h2>Action History</h2>
+            <span className="page-summary">{firstActionNumber.toLocaleString()}–{lastActionNumber.toLocaleString()} of {result?.totalElements.toLocaleString() ?? '…'}</span>
+          </div>
+          <form className="action-filters" onSubmit={applySearch}>
+            <select value={status} onChange={event => { setStatus(event.target.value); setPage(0); }} aria-label="Filter by status">
+              <option value="">All statuses</option>
+              {actionStatuses.map(value => <option key={value} value={value}>{readableActionValue(value)}</option>)}
+            </select>
+            <select value={actionType} onChange={event => { setActionType(event.target.value); setPage(0); }} aria-label="Filter by action type">
+              <option value="">All action types</option>
+              {actionTypes.map(value => <option key={value} value={value}>{readableActionValue(value)}</option>)}
+            </select>
+            <input value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Target, action ID, result…" aria-label="Search actions" />
+            <button>Search</button>
+          </form>
+        </div>
+
+        {loading && !result && <div className="loading-inline">Loading SOAR action history…</div>}
+        <div className="table-scroll">
+          <table className="action-table">
+            <thead>
+              <tr><th>Requested</th><th>Action</th><th>Target</th><th>Incident</th><th>Status</th><th>Completed</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+              {result?.content.map(action => (
+                <tr key={action.id}>
+                  <td className="timestamp-cell">{formatTimestamp(action.requestedAt)}<small title={action.id}>{action.id.slice(0, 8)}</small></td>
+                  <td><strong>{readableActionValue(action.actionType)}</strong><small>{action.requestedBy || 'Unknown requester'}</small></td>
+                  <td className="mono-cell">{action.target}</td>
+                  <td><button className="incident-link" onClick={() => onOpenIncident(action.incidentId)}>INC-{String(action.incidentId).padStart(4, '0')}</button></td>
+                  <td><span className={actionStatusClass(action.status)}>{readableActionValue(action.status)}</span></td>
+                  <td className="timestamp-cell">{formatTimestamp(action.completedAt)}</td>
+                  <td className="result-cell" title={action.resultMessage}>{action.resultMessage || (action.status === 'DISPATCHED' ? 'Awaiting SOAR result' : '—')}</td>
+                </tr>
+              ))}
+              {!loading && result?.content.length === 0 && <tr><td colSpan={7} className="table-empty">No actions match the current filters.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="pagination">
+          <button disabled={loading || !result || result.first} onClick={() => setPage(current => Math.max(0, current - 1))}>Previous</button>
+          <span>Page {(result?.page ?? 0) + 1} of {Math.max(result?.totalPages ?? 0, 1)}</span>
+          <button disabled={loading || !result || result.last} onClick={() => setPage(current => current + 1)}>Next</button>
+        </div>
+      </div>
+    </section>
   );
 }
 

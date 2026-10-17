@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socdss.incident.Incident;
 import com.socdss.incident.IncidentRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +71,58 @@ public class ResponseActionService {
         return actionRepository.findByIncidentIdOrderByRequestedAtDesc(incidentId).stream()
                 .map(ResponseActionDto::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseActionPageDto page(int page, int size, String status, String actionType, String search) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 10), 100);
+        Page<ResponseAction> result = actionRepository.search(
+                normalize(status, true),
+                normalize(actionType, false),
+                normalize(search, false),
+                PageRequest.of(safePage, safeSize)
+        );
+        return new ResponseActionPageDto(
+                result.getContent().stream().map(ResponseActionDto::from).toList(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.isFirst(),
+                result.isLast()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseActionSummaryDto summary() {
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        actionRepository.countGroupedByStatus().stream()
+                .sorted((left, right) -> left.getStatus().compareTo(right.getStatus()))
+                .forEach(count -> byStatus.put(count.getStatus(), count.getTotal()));
+
+        Map<String, Long> byType = new LinkedHashMap<>();
+        actionRepository.countGroupedByActionType().stream()
+                .sorted((left, right) -> left.getActionType().compareTo(right.getActionType()))
+                .forEach(count -> byType.put(count.getActionType(), count.getTotal()));
+
+        long executed = count(byStatus, "EXECUTED");
+        long dryRun = count(byStatus, "DRY_RUN");
+        long failed = count(byStatus, "FAILED");
+        Instant lastProcessedAt = actionRepository.findLatestCompletedAt();
+        return new ResponseActionSummaryDto(
+                byStatus.values().stream().mapToLong(Long::longValue).sum(),
+                executed + dryRun + failed,
+                executed,
+                dryRun,
+                failed,
+                count(byStatus, "PENDING_APPROVAL"),
+                count(byStatus, "APPROVED") + count(byStatus, "DISPATCHED"),
+                count(byStatus, "REJECTED"),
+                lastProcessedAt,
+                byStatus,
+                byType
+        );
     }
 
     @Transactional
@@ -152,6 +206,18 @@ public class ResponseActionService {
     private boolean isTerminal(String status) {
         return "EXECUTED".equals(status) || "FAILED".equals(status)
                 || "DRY_RUN".equals(status) || "REJECTED".equals(status);
+    }
+
+    private String normalize(String value, boolean uppercase) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        return uppercase ? normalized.toUpperCase(java.util.Locale.ROOT) : normalized;
+    }
+
+    private long count(Map<String, Long> counts, String key) {
+        return counts.getOrDefault(key, 0L);
     }
 
     private ResponseAction automaticAction(ActionResultV1 result) {

@@ -129,7 +129,8 @@ http://localhost:5173
 3. Upload `data/sample/wazuh-alerts-sample.json`.
 4. Click **Correlate Alerts**.
 5. Review generated incidents, risk scores and recommendations.
-6. Export incident CSV from the Reports section or API.
+6. Approve a response action and open **SOAR Actions** to follow its execution result.
+7. Export incident CSV from the Reports section or API.
 
 ## Optional Wazuh Lab
 
@@ -161,6 +162,8 @@ GET    /api/v1/incidents/{id}/actions
 POST   /api/v1/incidents/{id}/actions
 POST   /api/v1/incidents/{id}/actions/{actionId}/approve
 POST   /api/v1/incidents/{id}/actions/{actionId}/reject
+GET    /api/v1/response-actions
+GET    /api/v1/response-actions/summary
 GET    /api/v1/dashboard/summary
 GET    /api/v1/reports/incidents.csv
 GET    /api/v1/health

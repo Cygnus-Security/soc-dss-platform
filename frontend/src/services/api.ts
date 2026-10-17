@@ -1,4 +1,4 @@
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, IncidentPage, ResponseAction, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
+import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, IncidentPage, ResponseAction, ResponseActionPage, ResponseActionSummary, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -152,6 +152,14 @@ export const api = {
     body: JSON.stringify(feedback)
   }),
   responseActions: (incidentId: number) => request<ResponseAction[]>(`/incidents/${incidentId}/actions`),
+  soarActions: (page = 0, size = 25, status = '', actionType = '', search = '') => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (status) params.set('status', status);
+    if (actionType) params.set('actionType', actionType);
+    if (search) params.set('search', search);
+    return request<ResponseActionPage>(`/response-actions?${params.toString()}`);
+  },
+  soarActionSummary: () => request<ResponseActionSummary>('/response-actions/summary'),
   createResponseAction: (incidentId: number, actionType: string, target: string, rationale: string, requestedBy: string) => request<ResponseAction>(`/incidents/${incidentId}/actions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

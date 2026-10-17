@@ -140,6 +140,30 @@ export interface ResponseAction {
   completedAt?: string;
 }
 
+export interface ResponseActionPage {
+  content: ResponseAction[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export interface ResponseActionSummary {
+  totalActions: number;
+  processedActions: number;
+  executedActions: number;
+  dryRunActions: number;
+  failedActions: number;
+  awaitingApprovalActions: number;
+  inProgressActions: number;
+  rejectedActions: number;
+  lastProcessedAt?: string;
+  actionsByStatus: Record<string, number>;
+  actionsByType: Record<string, number>;
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   username?: string;
