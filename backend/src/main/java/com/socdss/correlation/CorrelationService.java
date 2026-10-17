@@ -9,7 +9,9 @@ import com.socdss.risk.RiskAssessmentResult;
 import com.socdss.risk.RiskAssessmentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -33,17 +35,20 @@ public class CorrelationService {
     private final IncidentRepository incidentRepository;
     private final RiskAssessmentService riskAssessmentService;
     private final RecommendationService recommendationService;
+    private final TransactionTemplate transactionTemplate;
     private final long timeWindowMinutes;
 
     public CorrelationService(SecurityAlertRepository alertRepository,
                               IncidentRepository incidentRepository,
                               RiskAssessmentService riskAssessmentService,
                               RecommendationService recommendationService,
+                              PlatformTransactionManager transactionManager,
                               @Value("${app.correlation.time-window-minutes:15}") long timeWindowMinutes) {
         this.alertRepository = alertRepository;
         this.incidentRepository = incidentRepository;
         this.riskAssessmentService = riskAssessmentService;
         this.recommendationService = recommendationService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.timeWindowMinutes = timeWindowMinutes;
     }
 
@@ -58,7 +63,8 @@ public class CorrelationService {
 
         executor.submit(() -> {
             try {
-                int incidentCount = correlateAll().size();
+                List<Incident> correlated = transactionTemplate.execute(status -> correlateAll());
+                int incidentCount = correlated == null ? 0 : correlated.size();
                 jobStatus.set(new CorrelationJobStatus(
                         "COMPLETED",
                         started.startedAt(),
