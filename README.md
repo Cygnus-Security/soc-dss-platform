@@ -88,6 +88,11 @@ make integration-up
 
 The command synchronizes and initializes all Git submodules before building, then enables the Wazuh polling profile. The ingestion gateway is available at `http://localhost:8090`; Syslog TCP/UDP listens on port `5514`. Use `make integration-down` to stop both projects.
 
+To demonstrate a real SOAR containment action against an isolated
+Metasploitable2 victim, follow
+[`docs/metasploitable2-soar-lab.md`](docs/metasploitable2-soar-lab.md). The lab
+does not publish the vulnerable services to the host or LAN.
+
 ## Run Product Locally for Development
 
 ### Backend

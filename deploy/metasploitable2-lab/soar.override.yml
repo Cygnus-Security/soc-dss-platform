@@ -1,0 +1,10 @@
+services:
+  response_server:
+    networks:
+      control_net:
+        ipv4_address: ${METASPLOITABLE_SOAR_IP:-172.31.253.2}
+
+networks:
+  control_net:
+    external: true
+    name: soc-dss-metasploitable2-control

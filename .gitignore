@@ -35,6 +35,7 @@ data/results/*.json
 *.pid
 deploy/wazuh-lab/runtime/
 deploy/production/runtime/
+deploy/metasploitable2-lab/runtime/
 
 # Temporary
 /tmp/
