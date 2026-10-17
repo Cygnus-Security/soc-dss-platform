@@ -1,4 +1,4 @@
-.PHONY: require-integration-env up down logs integration-up integration-down integration-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
+.PHONY: require-integration-env up down logs integration-up integration-down integration-logs soar-action-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
 
 INTEGRATION_ENV ?= deploy/production/.env
 SOAR_COMPOSE := integrations/soar-mcp-platform/docker-compose.yml
@@ -30,6 +30,9 @@ integration-down: require-integration-env
 
 integration-logs: require-integration-env
 	docker compose --env-file "$(INTEGRATION_ENV)" -f "$(SOAR_COMPOSE)" --profile wazuh logs -f ingestion_gateway normalizer_worker syslog_receiver wazuh_poller soar_host response_server
+
+soar-action-logs:
+	bash ./scripts/soar-action-logs.sh
 
 backend:
 	cd backend && mvn spring-boot:run

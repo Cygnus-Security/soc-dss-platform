@@ -63,6 +63,16 @@ _lock = threading.Lock()
 _timers: dict[str, threading.Timer] = {}
 
 
+def _console_log(event: str, **fields) -> None:
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "component": "firewall_executor",
+        "event": event,
+    }
+    record.update({key: value for key, value in fields.items() if value is not None})
+    print(f"[SOAR_GATEWAY] {json.dumps(record, separators=(',', ':'), default=str)}", flush=True)
+
+
 def _run_iptables(*arguments: str, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["iptables", "-w", "5", *arguments],
@@ -151,6 +161,13 @@ def _unblock(target: str, action_id: str) -> None:
             "target": target,
             "removed": removed,
         })
+        _console_log(
+            "block_expired",
+            action_id=action_id,
+            target=target,
+            rule_removed=removed,
+            active_blocks=len(_timers),
+        )
 
 
 def _block(target: str, action_id: str) -> dict:
@@ -179,6 +196,15 @@ def _block(target: str, action_id: str) -> dict:
             "already_present": already_present,
             "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
         })
+        _console_log(
+            "block_installed",
+            action_id=action_id,
+            target=target,
+            ttl_seconds=BLOCK_TTL_SECONDS,
+            already_present=already_present,
+            expires_at=expires_at.isoformat().replace("+00:00", "Z"),
+            active_blocks=len(_timers),
+        )
         return {
             "status": "EXECUTED",
             "message": f"Blocked {target} from Metasploitable2 for {BLOCK_TTL_SECONDS} seconds",
@@ -223,6 +249,11 @@ class Handler(BaseHTTPRequestHandler):
         supplied = self.headers.get("Authorization", "")
         expected = f"Bearer {TOKEN}"
         if not TOKEN or not hmac.compare_digest(supplied, expected):
+            _console_log(
+                "request_rejected",
+                source=self.client_address[0],
+                reason="invalid_token",
+            )
             self._send(401, {"error": "invalid_token"})
             return
         request = {}
@@ -236,6 +267,13 @@ class Handler(BaseHTTPRequestHandler):
             if request.get("action_type") != "temporary_ip_block":
                 raise ValueError("action_not_supported")
             target = ipaddress.ip_address(str(request.get("target", "")))
+            _console_log(
+                "request_received",
+                action_id=str(request.get("action_id", "")),
+                action_type=str(request.get("action_type", "")),
+                target=str(target),
+                source=self.client_address[0],
+            )
             if not _target_allowed(target):
                 raise ValueError("target_not_allowed_in_lab")
             action_id = str(request.get("action_id", ""))
@@ -249,10 +287,27 @@ class Handler(BaseHTTPRequestHandler):
                 "target": str(request.get("target", "")),
                 "reason": str(error),
             })
+            _console_log(
+                "request_rejected",
+                action_id=str(request.get("action_id", "")),
+                action_type=str(request.get("action_type", "")),
+                target=str(request.get("target", "")),
+                source=self.client_address[0],
+                reason=str(error),
+            )
             self._send(400, {"error": str(error)})
         except Exception as error:
             error_id = hashlib.sha256(repr(error).encode()).hexdigest()[:12]
             _audit({"event": "ERROR", "error_id": error_id, "error": str(error)})
+            _console_log(
+                "request_failed",
+                action_id=str(request.get("action_id", "")),
+                target=str(request.get("target", "")),
+                source=self.client_address[0],
+                error_id=error_id,
+                error_type=type(error).__name__,
+                error=str(error)[:500],
+            )
             self._send(500, {"error": "execution_failed", "error_id": error_id})
 
     def log_message(self, format_string: str, *arguments) -> None:
@@ -263,10 +318,13 @@ if __name__ == "__main__":
     if not TOKEN:
         raise SystemExit("ACTION_WEBHOOK_TOKEN is required")
     _protect_control_plane()
-    print(
-        f"[READY] webhook=:9000 target={ALLOWED_TARGET_IP} "
-        f"cidrs={','.join(str(network) for network in ALLOWED_TARGET_CIDRS)} "
-        f"max_active={MAX_ACTIVE_BLOCKS} ttl={BLOCK_TTL_SECONDS}s",
-        flush=True,
+    _console_log(
+        "gateway_ready",
+        listen_port=LISTEN_PORT,
+        allowed_target=str(ALLOWED_TARGET_IP),
+        allowed_target_cidrs=[str(network) for network in ALLOWED_TARGET_CIDRS],
+        denied_control_subnet=str(CONTROL_SUBNET),
+        max_active_blocks=MAX_ACTIVE_BLOCKS,
+        ttl_seconds=BLOCK_TTL_SECONDS,
     )
     ThreadingHTTPServer(("0.0.0.0", LISTEN_PORT), Handler).serve_forever()

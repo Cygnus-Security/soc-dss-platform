@@ -160,11 +160,24 @@ host consumes the actions sequentially; the default batch size is 50.
 Monitor progress and count active managed rules with:
 
 ```bash
-docker logs --since 5m -f mcp_soar_host
+make soar-action-logs
 docker exec soc-dss-metasploitable2-firewall \
   sh -lc "iptables -S INPUT | grep -c 'soc-dss-lab:'"
 tail -n 100 deploy/metasploitable2-lab/runtime/firewall/firewall-audit.jsonl
 ```
+
+`make soar-action-logs` combines the three execution stages and prefixes every
+line with its container name:
+
+- `mcp_soar_host`: Kafka polling, sequential batch position, execution duration,
+  result publication, throttle delay, and offset commit.
+- `mcp_response_server`: approval validation, idempotency, adapter mode, gateway
+  HTTP status/body, audit write, and final action status.
+- `soc-dss-metasploitable2-firewall`: request receipt, rejection reason, rule
+  installation, active-rule count, and TTL expiry/removal.
+
+Set `SOAR_LOG_SINCE=30m` to include an earlier window. Approval tokens, webhook
+tokens, and signing secrets are never included in these logs.
 
 An `EXECUTED` result proves that the rule was installed in the isolated victim
 namespace. Only the dedicated test client provides an observable connectivity
