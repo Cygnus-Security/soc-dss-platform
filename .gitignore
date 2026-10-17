@@ -40,5 +40,7 @@ deploy/metasploitable2-lab/runtime/
 # Temporary
 /tmp/
 *.tmp
+__pycache__/
+*.py[cod]
 
 */DSS-SOC

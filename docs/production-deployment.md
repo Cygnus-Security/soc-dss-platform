@@ -5,7 +5,7 @@
 ```bash
 cp deploy/production/.env.example deploy/production/.env
 ./scripts/prepare-production-storage.sh
-docker compose -f deploy/production/docker-compose.yml up --build -d
+docker compose --env-file deploy/production/.env -f deploy/production/docker-compose.yml up --build -d
 ```
 
 ## Access
@@ -50,12 +50,12 @@ Restore a backup:
 ## Stop Services
 
 ```bash
-docker compose -f deploy/production/docker-compose.yml down
+docker compose --env-file deploy/production/.env -f deploy/production/docker-compose.yml down
 ```
 
 ## Reset Database
 
 ```bash
-docker compose -f deploy/production/docker-compose.yml down
+docker compose --env-file deploy/production/.env -f deploy/production/docker-compose.yml down
 rm -rf deploy/production/runtime/postgres/data
 ```

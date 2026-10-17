@@ -1,32 +1,35 @@
-.PHONY: up down logs integration-up integration-down integration-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
+.PHONY: require-integration-env up down logs integration-up integration-down integration-logs backend frontend build wazuh-lab-up wazuh-lab-down wazuh-lab-export wazuh-lab-import metasploitable2-lab-up metasploitable2-lab-down metasploitable2-lab-logs metasploitable2-lab-probe metasploitable2-lab-probe-blocked metasploitable2-lab-rules metasploitable2-lab-seed clean
 
 INTEGRATION_ENV ?= deploy/production/.env
 SOAR_COMPOSE := integrations/soar-mcp-platform/docker-compose.yml
 METASPLOITABLE2_LAB_COMPOSE := deploy/metasploitable2-lab/docker-compose.yml
 METASPLOITABLE2_SOAR_OVERRIDE := deploy/metasploitable2-lab/soar.override.yml
 
-up:
-	docker compose -f deploy/production/docker-compose.yml up --build -d
+require-integration-env:
+	@test -f "$(INTEGRATION_ENV)" || (echo "Missing $(INTEGRATION_ENV). Copy deploy/production/.env.example first." >&2; exit 1)
 
-down:
-	docker compose -f deploy/production/docker-compose.yml down
+up: require-integration-env
+	docker compose --env-file "$(INTEGRATION_ENV)" -f deploy/production/docker-compose.yml up --build -d
 
-logs:
-	docker compose -f deploy/production/docker-compose.yml logs -f
+down: require-integration-env
+	docker compose --env-file "$(INTEGRATION_ENV)" -f deploy/production/docker-compose.yml down
 
-integration-up:
+logs: require-integration-env
+	docker compose --env-file "$(INTEGRATION_ENV)" -f deploy/production/docker-compose.yml logs -f
+
+integration-up: require-integration-env
 	git submodule sync --recursive
 	git submodule update --init --recursive
 	docker network inspect backend_net >/dev/null 2>&1 || docker network create backend_net
-	docker compose -f deploy/production/docker-compose.yml up --build -d
-	docker compose -f integrations/soar-mcp-platform/docker-compose.yml --profile wazuh up --build -d
+	docker compose --env-file "$(INTEGRATION_ENV)" -f deploy/production/docker-compose.yml up --build -d
+	docker compose --env-file "$(INTEGRATION_ENV)" -f "$(SOAR_COMPOSE)" --profile wazuh up --build -d
 
-integration-down:
-	docker compose -f integrations/soar-mcp-platform/docker-compose.yml --profile wazuh down
-	docker compose -f deploy/production/docker-compose.yml down
+integration-down: require-integration-env
+	docker compose --env-file "$(INTEGRATION_ENV)" -f "$(SOAR_COMPOSE)" --profile wazuh down
+	docker compose --env-file "$(INTEGRATION_ENV)" -f deploy/production/docker-compose.yml down
 
-integration-logs:
-	docker compose -f integrations/soar-mcp-platform/docker-compose.yml --profile wazuh logs -f ingestion_gateway normalizer_worker syslog_receiver wazuh_poller soar_host response_server
+integration-logs: require-integration-env
+	docker compose --env-file "$(INTEGRATION_ENV)" -f "$(SOAR_COMPOSE)" --profile wazuh logs -f ingestion_gateway normalizer_worker syslog_receiver wazuh_poller soar_host response_server
 
 backend:
 	cd backend && mvn spring-boot:run

@@ -65,7 +65,7 @@ soc-dss-platform-enterprise/
 ```bash
 cd soc-dss-platform-enterprise
 cp deploy/production/.env.example deploy/production/.env
-docker compose -f deploy/production/docker-compose.yml up --build -d
+docker compose --env-file deploy/production/.env -f deploy/production/docker-compose.yml up --build -d
 ```
 
 Open the dashboard:

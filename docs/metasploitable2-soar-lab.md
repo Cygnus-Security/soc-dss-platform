@@ -13,9 +13,10 @@ LAN and Internet:
 - `172.31.253.0/29`: SOAR response server (`.2`) and firewall executor (`.3`).
 
 The firewall executor shares the victim network namespace. It has only
-`NET_ADMIN`, accepts the signed action gateway request only for
-`172.31.252.10`, and automatically removes the rule after the configured TTL.
-The victim cannot initiate a connection toward the SOAR control address.
+`NET_ADMIN`, accepts action targets only from configured RFC1918 CIDRs, denies
+the SOAR control subnet even when it overlaps an allowed CIDR, and automatically
+removes each rule after the configured TTL. The victim cannot initiate a
+connection toward the SOAR control address.
 
 The pinned community container is Linux/AMD64 and is old by design. Rapid7
 publishes Metasploitable2 as a deliberately vulnerable VM; the Docker image is
@@ -38,9 +39,16 @@ SOAR_EXECUTION_MODE=live
 SOAR_ACTION_WEBHOOK_URL=http://172.31.253.3:9000/v1/actions
 SOAR_ACTION_WEBHOOK_TOKEN=<paste-the-generated-token>
 METASPLOITABLE_BLOCK_TTL_SECONDS=120
+METASPLOITABLE_ALLOWED_TARGET_CIDRS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+METASPLOITABLE_MAX_ACTIVE_BLOCKS=200
 ```
 
 Keep `ACTION_APPROVAL_SECRET` unchanged and identical between SOC-DSS and SOAR.
+The CIDR allowlist accepts private dataset source addresses for bulk-live
+workflow demonstrations. Every rule is applied only inside the isolated victim
+network namespace. The control subnet is always denied, and public IP ranges
+cannot be configured. Only the dedicated `172.31.252.10` client provides the
+end-to-end connectivity assertion described below.
 
 If either lab subnet overlaps an existing Docker network, select two unused
 subnets and update every corresponding address in the same `.env` file.
@@ -140,6 +148,28 @@ tail -n 10 deploy/metasploitable2-lab/runtime/firewall/firewall-audit.jsonl
 
 After the TTL expires, `make metasploitable2-lab-probe` must pass again and the
 audit must contain an `UNBLOCK` event.
+
+### Bulk-live workflow
+
+The same isolated executor can hold up to
+`METASPLOITABLE_MAX_ACTIVE_BLOCKS` unique private source-IP rules. Select up to
+100 incidents whose source IPs are within `METASPLOITABLE_ALLOWED_TARGET_CIDRS`,
+enter the bulk rationale, and dispatch them from the incident list. The SOAR
+host consumes the actions sequentially; the default batch size is 50.
+
+Monitor progress and count active managed rules with:
+
+```bash
+docker logs --since 5m -f mcp_soar_host
+docker exec soc-dss-metasploitable2-firewall \
+  sh -lc "iptables -S INPUT | grep -c 'soc-dss-lab:'"
+tail -n 100 deploy/metasploitable2-lab/runtime/firewall/firewall-audit.jsonl
+```
+
+An `EXECUTED` result proves that the rule was installed in the isolated victim
+namespace. Only the dedicated test client provides an observable connectivity
+test; imported dataset addresses normally have no corresponding live client in
+the lab.
 
 ## 6. Stop the lab
 
