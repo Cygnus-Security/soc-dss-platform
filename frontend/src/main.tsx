@@ -18,13 +18,14 @@ import {
   YAxis
 } from 'recharts';
 import { api } from './services/api';
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, ResponseAction, ResponseActionPage, ResponseActionStatus, ResponseActionSummary, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
+import type { AuthStatus, BulkDispatchResult, CorrelationJobStatus, DashboardSummary, ImportProgress, Incident, ImportResult, ResponseAction, ResponseActionPage, ResponseActionStatus, ResponseActionSummary, RiskAssessmentResult, RiskModel, WhatIfRequest } from './types';
 import './styles.css';
 
 type ChartView = 'risk-bar' | 'risk-donut' | 'score-bar' | 'score-line';
 
 const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
 const INCIDENT_PAGE_SIZE = 50;
+const MAX_BULK_INCIDENTS = 100;
 const SOAR_ACTION_PAGE_SIZE = 25;
 const actionStatuses: ResponseActionStatus[] = ['PENDING_APPROVAL', 'APPROVED', 'DISPATCHED', 'EXECUTED', 'DRY_RUN', 'FAILED', 'REJECTED'];
 
@@ -105,6 +106,10 @@ function App() {
   const [incidentTotalPages, setIncidentTotalPages] = React.useState(0);
   const [incidentTotalElements, setIncidentTotalElements] = React.useState(0);
   const [incidentsLoading, setIncidentsLoading] = React.useState(false);
+  const [selectedIncidentIds, setSelectedIncidentIds] = React.useState<Set<number>>(() => new Set());
+  const [bulkRationale, setBulkRationale] = React.useState('Bulk containment of selected incident source IPs');
+  const [bulkDispatching, setBulkDispatching] = React.useState(false);
+  const [bulkResult, setBulkResult] = React.useState<BulkDispatchResult | null>(null);
   const [summaryLoading, setSummaryLoading] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState('');
@@ -168,6 +173,8 @@ function App() {
     setIncidentPage(0);
     setIncidentTotalPages(0);
     setIncidentTotalElements(0);
+    setSelectedIncidentIds(new Set());
+    setBulkResult(null);
   }
 
   async function handleCorrelate() {
@@ -208,6 +215,74 @@ function App() {
     setSelectedIncident(await api.incident(id));
   }
 
+  function isActionableIncident(incident: Incident) {
+    return Boolean(incident.sourceIp && incident.sourceIp.trim() && incident.sourceIp.toLowerCase() !== 'unknown');
+  }
+
+  function toggleIncidentSelection(incident: Incident) {
+    if (!isActionableIncident(incident)) return;
+    const next = new Set(selectedIncidentIds);
+    if (next.has(incident.id)) {
+      next.delete(incident.id);
+    } else if (next.size < MAX_BULK_INCIDENTS) {
+      next.add(incident.id);
+    } else {
+      setMessage(`A bulk dispatch is limited to ${MAX_BULK_INCIDENTS} incidents.`);
+    }
+    setSelectedIncidentIds(next);
+    setBulkResult(null);
+  }
+
+  function toggleCurrentIncidentPage() {
+    const eligibleIds = incidents.filter(isActionableIncident).map(incident => incident.id);
+    const allSelected = eligibleIds.length > 0 && eligibleIds.every(id => selectedIncidentIds.has(id));
+    const next = new Set(selectedIncidentIds);
+    if (allSelected) {
+      eligibleIds.forEach(id => next.delete(id));
+    } else {
+      let omitted = 0;
+      for (const id of eligibleIds) {
+        if (next.has(id)) continue;
+        if (next.size >= MAX_BULK_INCIDENTS) {
+          omitted++;
+        } else {
+          next.add(id);
+        }
+      }
+      if (omitted > 0) {
+        setMessage(`${omitted} incident(s) were not selected because the bulk limit is ${MAX_BULK_INCIDENTS}.`);
+      }
+    }
+    setSelectedIncidentIds(next);
+    setBulkResult(null);
+  }
+
+  async function dispatchSelectedIncidents() {
+    const incidentIds = Array.from(selectedIncidentIds);
+    if (incidentIds.length === 0 || !bulkRationale.trim()) return;
+    if (!window.confirm(`Approve and dispatch ${incidentIds.length} temporary IP block action(s) to SOAR?`)) return;
+
+    setBulkDispatching(true);
+    setBulkResult(null);
+    try {
+      const result = await api.bulkDispatchResponseActions(incidentIds, bulkRationale.trim());
+      setBulkResult(result);
+      const failedIds = new Set(
+        result.items
+          .filter(item => item.outcome === 'FAILED' && item.incidentId != null)
+          .map(item => item.incidentId as number)
+      );
+      setSelectedIncidentIds(failedIds);
+      setMessage(
+        `SOAR bulk dispatch finished: ${result.dispatched} dispatched, ${result.skipped} skipped, ${result.failed} failed.`
+      );
+    } catch {
+      setMessage('Unable to dispatch the selected incidents. Check the backend connection and Kafka logs.');
+    } finally {
+      setBulkDispatching(false);
+    }
+  }
+
   const riskData = riskChartData(summary);
   const scoreData = scoreChartData(incidents);
   const chartHasData = chartView.startsWith('risk') ? riskData.length > 0 : scoreData.length > 0;
@@ -217,6 +292,9 @@ function App() {
   const reportRange = reportFrom && reportTo ? { from: reportFrom, to: reportTo } : undefined;
   const firstIncidentNumber = incidentTotalElements === 0 ? 0 : incidentPage * INCIDENT_PAGE_SIZE + 1;
   const lastIncidentNumber = Math.min((incidentPage + 1) * INCIDENT_PAGE_SIZE, incidentTotalElements);
+  const actionableIncidentsOnPage = incidents.filter(isActionableIncident);
+  const allActionableOnPageSelected = actionableIncidentsOnPage.length > 0
+    && actionableIncidentsOnPage.every(incident => selectedIncidentIds.has(incident.id));
 
   if (!auth) {
     return <div className="auth-shell"><div className="panel auth-panel"><h1>SOC DSS</h1><p>Checking session...</p></div></div>;
@@ -401,27 +479,98 @@ function App() {
                   {firstIncidentNumber.toLocaleString()}–{lastIncidentNumber.toLocaleString()} of {incidentTotalElements.toLocaleString()}
                 </span>
               </div>
-              {incidentsLoading && <div className="loading-inline">Loading page {incidentPage + 1}…</div>}
-              <table>
-                <thead>
-                  <tr><th>ID</th><th>Type</th><th>Asset</th><th>Alerts</th><th>Score</th><th>Level</th></tr>
-                </thead>
-                <tbody>
-                  {incidents.map(i => (
-                    <tr key={i.id} onClick={() => openIncident(i.id)} className={selectedIncident?.id === i.id ? 'selected' : ''}>
-                      <td>INC-{String(i.id).padStart(4, '0')}</td>
-                      <td>{i.incidentType}</td>
-                      <td>{i.targetAsset}</td>
-                      <td>{i.alertCount}</td>
-                      <td>{i.riskScore}</td>
-                      <td><span className={riskClass(i.riskLevel)}>{i.riskLevel}</span></td>
-                    </tr>
-                  ))}
-                  {!incidentsLoading && incidents.length === 0 && (
-                    <tr><td colSpan={6} className="table-empty">No incidents found.</td></tr>
+              <div className="bulk-action-bar">
+                <div className="bulk-selection-summary">
+                  <strong>{selectedIncidentIds.size} / {MAX_BULK_INCIDENTS} selected</strong>
+                  <span>Selections stay active while you move between pages.</span>
+                </div>
+                <input
+                  aria-label="Bulk action rationale"
+                  value={bulkRationale}
+                  maxLength={2000}
+                  onChange={event => setBulkRationale(event.target.value)}
+                  placeholder="Reason for this bulk response"
+                />
+                <button
+                  className="secondary-button"
+                  disabled={selectedIncidentIds.size === 0 || bulkDispatching}
+                  onClick={() => {
+                    setSelectedIncidentIds(new Set());
+                    setBulkResult(null);
+                  }}
+                >
+                  Clear
+                </button>
+                <button
+                  disabled={selectedIncidentIds.size === 0 || !bulkRationale.trim() || bulkDispatching}
+                  onClick={dispatchSelectedIncidents}
+                >
+                  {bulkDispatching ? 'Dispatching…' : `Send ${selectedIncidentIds.size} to SOAR`}
+                </button>
+              </div>
+              {bulkResult && (
+                <div className={bulkResult.failed > 0 ? 'bulk-result bulk-result-warn' : 'bulk-result'}>
+                  <strong>Bulk result</strong>
+                  <span>{bulkResult.dispatched} dispatched · {bulkResult.skipped} skipped · {bulkResult.failed} failed</span>
+                  {bulkResult.failed > 0 && (
+                    <small>
+                      {bulkResult.items
+                        .filter(item => item.outcome === 'FAILED')
+                        .slice(0, 5)
+                        .map(item => `INC-${item.incidentId ?? '?'}: ${item.message}`)
+                        .join(' | ')}
+                    </small>
                   )}
-                </tbody>
-              </table>
+                  <button onClick={() => setPage('soar')}>View SOAR actions</button>
+                </div>
+              )}
+              {incidentsLoading && <div className="loading-inline">Loading page {incidentPage + 1}…</div>}
+              <div className="table-scroll">
+                <table className="incident-table">
+                  <thead>
+                    <tr>
+                      <th className="select-cell">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all actionable incidents on this page"
+                          checked={allActionableOnPageSelected}
+                          disabled={actionableIncidentsOnPage.length === 0 || bulkDispatching}
+                          onChange={toggleCurrentIncidentPage}
+                        />
+                      </th>
+                      <th>ID</th><th>Type</th><th>Asset</th><th>Alerts</th><th>Score</th><th>Level</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incidents.map(i => {
+                      const actionable = isActionableIncident(i);
+                      return (
+                        <tr key={i.id} onClick={() => openIncident(i.id)} className={selectedIncident?.id === i.id ? 'selected' : ''}>
+                          <td className="select-cell" onClick={event => event.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              aria-label={`Select incident ${i.id}`}
+                              checked={selectedIncidentIds.has(i.id)}
+                              disabled={!actionable || bulkDispatching}
+                              title={actionable ? 'Select for bulk SOAR dispatch' : 'This incident has no actionable source IP'}
+                              onChange={() => toggleIncidentSelection(i)}
+                            />
+                          </td>
+                          <td>INC-{String(i.id).padStart(4, '0')}</td>
+                          <td>{i.incidentType}</td>
+                          <td>{i.targetAsset}</td>
+                          <td>{i.alertCount}</td>
+                          <td>{i.riskScore}</td>
+                          <td><span className={riskClass(i.riskLevel)}>{i.riskLevel}</span></td>
+                        </tr>
+                      );
+                    })}
+                    {!incidentsLoading && incidents.length === 0 && (
+                      <tr><td colSpan={7} className="table-empty">No incidents found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
               <div className="pagination">
                 <button
                   disabled={incidentsLoading || incidentPage === 0}

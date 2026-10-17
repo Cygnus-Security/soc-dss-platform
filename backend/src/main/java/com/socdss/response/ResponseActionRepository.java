@@ -7,10 +7,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ResponseActionRepository extends JpaRepository<ResponseAction, String> {
     List<ResponseAction> findByIncidentIdOrderByRequestedAtDesc(Long incidentId);
+
+    Optional<ResponseAction> findFirstByIncidentIdAndActionTypeAndStatusInOrderByRequestedAtDesc(
+            Long incidentId,
+            String actionType,
+            Collection<String> statuses
+    );
 
     @Query(
             value = """

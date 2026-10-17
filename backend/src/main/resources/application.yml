@@ -53,4 +53,4 @@ app:
     dead-letter-topic: ${KAFKA_DLQ_TOPIC:soc.dlq.v1}
   response:
     approval-secret: ${ACTION_APPROVAL_SECRET:change-this-development-secret-32-characters}
-    approval-ttl-minutes: ${ACTION_APPROVAL_TTL_MINUTES:10}
+    approval-ttl-minutes: ${ACTION_APPROVAL_TTL_MINUTES:60}

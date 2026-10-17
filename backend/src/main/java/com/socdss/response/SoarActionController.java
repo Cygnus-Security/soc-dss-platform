@@ -1,6 +1,11 @@
 package com.socdss.response;
 
+import com.socdss.auth.AuthSession;
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -9,9 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/response-actions")
 public class SoarActionController {
     private final ResponseActionService actionService;
+    private final BulkResponseActionService bulkActionService;
 
-    public SoarActionController(ResponseActionService actionService) {
+    public SoarActionController(ResponseActionService actionService,
+                                BulkResponseActionService bulkActionService) {
         this.actionService = actionService;
+        this.bulkActionService = bulkActionService;
     }
 
     @GetMapping
@@ -26,5 +34,15 @@ public class SoarActionController {
     @GetMapping("/summary")
     public ResponseActionSummaryDto summary() {
         return actionService.summary();
+    }
+
+    @PostMapping("/bulk-dispatch")
+    public BulkDispatchResultDto bulkDispatch(@Valid @RequestBody BulkDispatchRequest request,
+                                              HttpSession session) {
+        Object username = session.getAttribute(AuthSession.USERNAME);
+        if (!(username instanceof String actor) || actor.isBlank()) {
+            throw new IllegalArgumentException("Authenticated username is required");
+        }
+        return bulkActionService.dispatch(request, actor);
     }
 }

@@ -1,3 +1,4 @@
 [submodule "integrations/soar-mcp-platform"]
 	path = integrations/soar-mcp-platform
 	url = https://github.com/Cygnus-Security/soar-mcp-platform.git
+	branch = develop

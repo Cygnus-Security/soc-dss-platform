@@ -164,6 +164,24 @@ export interface ResponseActionSummary {
   actionsByType: Record<string, number>;
 }
 
+export type BulkDispatchOutcome = 'DISPATCHED' | 'SKIPPED' | 'FAILED';
+
+export interface BulkDispatchItem {
+  incidentId?: number;
+  actionId?: string;
+  target?: string;
+  outcome: BulkDispatchOutcome;
+  message: string;
+}
+
+export interface BulkDispatchResult {
+  requested: number;
+  dispatched: number;
+  skipped: number;
+  failed: number;
+  items: BulkDispatchItem[];
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   username?: string;

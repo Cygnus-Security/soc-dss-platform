@@ -38,7 +38,7 @@ public class ResponseActionService {
             ObjectMapper objectMapper,
             @Value("${app.kafka.approved-action-topic}") String approvedTopic,
             @Value("${app.kafka.enabled:false}") boolean kafkaEnabled,
-            @Value("${app.response.approval-ttl-minutes:10}") long approvalTtlMinutes
+            @Value("${app.response.approval-ttl-minutes:60}") long approvalTtlMinutes
     ) {
         this.incidentRepository = incidentRepository;
         this.actionRepository = actionRepository;

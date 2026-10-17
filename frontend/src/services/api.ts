@@ -1,4 +1,4 @@
-import type { AuthStatus, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, IncidentPage, ResponseAction, ResponseActionPage, ResponseActionSummary, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
+import type { AuthStatus, BulkDispatchResult, CorrelationJobStatus, DashboardSummary, ImportProgress, ImportResult, Incident, IncidentFeedback, IncidentPage, ResponseAction, ResponseActionPage, ResponseActionSummary, RiskAssessmentResult, RiskModel, SecurityAlert, WhatIfRequest } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -160,6 +160,11 @@ export const api = {
     return request<ResponseActionPage>(`/response-actions?${params.toString()}`);
   },
   soarActionSummary: () => request<ResponseActionSummary>('/response-actions/summary'),
+  bulkDispatchResponseActions: (incidentIds: number[], rationale: string) => request<BulkDispatchResult>('/response-actions/bulk-dispatch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ incidentIds, actionType: 'temporary_ip_block', rationale })
+  }),
   createResponseAction: (incidentId: number, actionType: string, target: string, rationale: string, requestedBy: string) => request<ResponseAction>(`/incidents/${incidentId}/actions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
