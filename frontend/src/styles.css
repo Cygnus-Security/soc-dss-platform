@@ -158,6 +158,11 @@ tr:hover, tr.selected { background: #f8fafc; }
 .live-refresh button, .action-filters button {
   padding: 9px 13px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; font-weight: 700;
 }
+.action-export {
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border-radius: 10px;
+  background: #102033; color: #fff; text-decoration: none; white-space: nowrap; font-weight: 700;
+}
+.action-export:hover { background: #1e293b; }
 .live-refresh button:disabled { opacity: .55; cursor: not-allowed; }
 .soar-cards { margin-bottom: 0; }
 .soar-overview { display: grid; grid-template-columns: minmax(320px, .8fr) minmax(480px, 1.2fr); gap: 20px; }

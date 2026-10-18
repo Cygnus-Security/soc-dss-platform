@@ -165,6 +165,7 @@ POST   /api/v1/incidents/{id}/actions/{actionId}/approve
 POST   /api/v1/incidents/{id}/actions/{actionId}/reject
 GET    /api/v1/response-actions
 GET    /api/v1/response-actions/summary
+GET    /api/v1/response-actions/export.csv
 POST   /api/v1/response-actions/bulk-dispatch
 GET    /api/v1/dashboard/summary
 GET    /api/v1/reports/incidents.csv

@@ -49,6 +49,22 @@ public interface ResponseActionRepository extends JpaRepository<ResponseAction, 
                                 @Param("search") String search,
                                 Pageable pageable);
 
+    @Query("""
+            SELECT action
+            FROM ResponseAction action
+            JOIN FETCH action.incident incident
+            WHERE (:status = '' OR action.status = :status)
+              AND (:actionType = '' OR action.actionType = :actionType)
+              AND (:search = ''
+                   OR LOWER(action.id) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(action.target) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(action.resultMessage) LIKE LOWER(CONCAT('%', :search, '%')))
+            ORDER BY action.requestedAt DESC, action.id DESC
+            """)
+    List<ResponseAction> searchForExport(@Param("status") String status,
+                                         @Param("actionType") String actionType,
+                                         @Param("search") String search);
+
     @Query("SELECT action.status AS status, COUNT(action) AS total FROM ResponseAction action GROUP BY action.status")
     List<ResponseActionStatusCount> countGroupedByStatus();
 

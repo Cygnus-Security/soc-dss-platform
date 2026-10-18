@@ -21,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class ResponseActionService {
+    private static final String CSV_HEADER = "action_id,incident_id,action_type,target,rationale,status,requested_by,requested_at,decided_by,decided_at,approval_expires_at,completed_at,result_message\n";
+    private static final String CSV_FORMULA_PREFIXES = "=+-@";
+
     private final IncidentRepository incidentRepository;
     private final ResponseActionRepository actionRepository;
     private final ApprovalTokenService tokenService;
@@ -125,6 +128,32 @@ public class ResponseActionService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public String exportCsv(String status, String actionType, String search) {
+        List<ResponseAction> actions = actionRepository.searchForExport(
+                normalize(status, true),
+                normalize(actionType, false),
+                normalize(search, false)
+        );
+        StringBuilder csv = new StringBuilder("\uFEFF").append(CSV_HEADER);
+        for (ResponseAction action : actions) {
+            csv.append(csvCell(action.getId())).append(',')
+                    .append(csvCell(action.getIncident().getId())).append(',')
+                    .append(csvCell(action.getActionType())).append(',')
+                    .append(csvCell(action.getTarget())).append(',')
+                    .append(csvCell(action.getRationale())).append(',')
+                    .append(csvCell(action.getStatus())).append(',')
+                    .append(csvCell(action.getRequestedBy())).append(',')
+                    .append(csvCell(action.getRequestedAt())).append(',')
+                    .append(csvCell(action.getDecidedBy())).append(',')
+                    .append(csvCell(action.getDecidedAt())).append(',')
+                    .append(csvCell(action.getApprovalExpiresAt())).append(',')
+                    .append(csvCell(action.getCompletedAt())).append(',')
+                    .append(csvCell(action.getResultMessage())).append('\n');
+        }
+        return csv.toString();
+    }
+
     @Transactional
     public ResponseActionDto approve(Long incidentId, String actionId, ActionDecisionRequest decision) {
         if (!kafkaEnabled) {
@@ -218,6 +247,15 @@ public class ResponseActionService {
 
     private long count(Map<String, Long> counts, String key) {
         return counts.getOrDefault(key, 0L);
+    }
+
+    private String csvCell(Object value) {
+        String text = value == null ? "" : String.valueOf(value);
+        if (!text.isEmpty() && (CSV_FORMULA_PREFIXES.indexOf(text.charAt(0)) >= 0
+                || text.charAt(0) == '\t' || text.charAt(0) == '\r')) {
+            text = "'" + text;
+        }
+        return "\"" + text.replace("\"", "\"\"") + "\"";
     }
 
     private ResponseAction automaticAction(ActionResultV1 result) {

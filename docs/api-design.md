@@ -44,6 +44,7 @@ POST /api/v1/incidents/correlate
 ```http
 GET  /api/v1/response-actions
 GET  /api/v1/response-actions/summary
+GET  /api/v1/response-actions/export.csv
 POST /api/v1/response-actions/bulk-dispatch
 ```
 

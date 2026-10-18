@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -52,6 +53,25 @@ class ResponseActionServiceTest {
                 .contains("\"approval_token\"")
                 .contains("\"action_type\":\"temporary_ip_block\"")
                 .contains("\"incident_id\":42");
+    }
+
+    @Test
+    void exportsFilteredActionsAsExcelSafeCsv() {
+        Incident incident = new Incident();
+        incident.setId(42L);
+        ResponseAction action = pendingAction(incident);
+        action.setTarget("=malicious-formula");
+        action.setRationale("Contain \"quoted\" target");
+        action.setResultMessage("line one\nline two");
+        when(actionRepository.searchForExport("EXECUTED", "temporary_ip_block", "malicious"))
+                .thenReturn(List.of(action));
+
+        String csv = service.exportCsv(" executed ", " temporary_ip_block ", " malicious ");
+
+        assertThat(csv).startsWith("\uFEFFaction_id,incident_id,action_type");
+        assertThat(csv).contains("\"'=malicious-formula\"");
+        assertThat(csv).contains("\"Contain \"\"quoted\"\" target\"");
+        assertThat(csv).contains("\"line one\nline two\"");
     }
 
     private ResponseAction pendingAction(Incident incident) {

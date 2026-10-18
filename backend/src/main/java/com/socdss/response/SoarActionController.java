@@ -3,6 +3,9 @@ package com.socdss.response;
 import com.socdss.auth.AuthSession;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,6 +37,16 @@ public class SoarActionController {
     @GetMapping("/summary")
     public ResponseActionSummaryDto summary() {
         return actionService.summary();
+    }
+
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    public ResponseEntity<String> exportCsv(@RequestParam(required = false) String status,
+                                            @RequestParam(required = false) String actionType,
+                                            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=soar-action-history.csv")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(actionService.exportCsv(status, actionType, search));
     }
 
     @PostMapping("/bulk-dispatch")

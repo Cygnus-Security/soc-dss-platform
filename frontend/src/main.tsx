@@ -986,6 +986,9 @@ function SoarActionsPage({ onOpenIncident }: { onOpenIncident: (id: number) => v
             </select>
             <input value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Target, action ID, result…" aria-label="Search actions" />
             <button>Search</button>
+            <a className="action-export" href={api.soarActionExportUrl(status, actionType, search)}>
+              <Download size={16} /> Export CSV
+            </a>
           </form>
         </div>
 

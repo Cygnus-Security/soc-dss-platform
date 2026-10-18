@@ -46,6 +46,15 @@ function reportQuery(range?: ReportRange) {
   return `?${params.toString()}`;
 }
 
+function soarActionQuery(status = '', actionType = '', search = '') {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (actionType) params.set('actionType', actionType);
+  if (search) params.set('search', search);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 async function importAlertBatch(lines: string[], batchNumber: number): Promise<ImportResult> {
   const form = new FormData();
   const blob = new Blob([lines.join('\n'), '\n'], { type: 'application/x-ndjson' });
@@ -160,6 +169,8 @@ export const api = {
     return request<ResponseActionPage>(`/response-actions?${params.toString()}`);
   },
   soarActionSummary: () => request<ResponseActionSummary>('/response-actions/summary'),
+  soarActionExportUrl: (status = '', actionType = '', search = '') =>
+    `${API_BASE}/response-actions/export.csv${soarActionQuery(status, actionType, search)}`,
   bulkDispatchResponseActions: (incidentIds: number[], rationale: string) => request<BulkDispatchResult>('/response-actions/bulk-dispatch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
